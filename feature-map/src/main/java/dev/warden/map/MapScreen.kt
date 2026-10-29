@@ -42,6 +42,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -120,6 +122,8 @@ fun MapScreen(
         }
     }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
+    // Lives outside the detail transition so coming back from a country keeps the scroll position.
+    val listState = rememberLazyListState()
     BackHandler(enabled = detail != null) { detail = null }
     val reduceMotion = Warden.reduceMotion
 
@@ -143,7 +147,7 @@ fun MapScreen(
         val d = destinations.firstOrNull { it.country.iso == iso }
         if (iso == null || d == null) {
             Overview(
-                g, destinations, onOpen = { detail = it },
+                g, destinations, listState, onOpen = { detail = it },
                 filter = {
                     Row(
                         Modifier.padding(horizontal = Spacing.xl),
@@ -162,7 +166,13 @@ fun MapScreen(
 }
 
 @Composable
-private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -> Unit, filter: @Composable () -> Unit) {
+private fun Overview(
+    g: Geo,
+    destinations: List<Destination>,
+    listState: LazyListState,
+    onOpen: (String) -> Unit,
+    filter: @Composable () -> Unit,
+) {
     val context = LocalContext.current
     val c = Warden.colors
     val home = remember(g) { homeCountry(context)?.let(g::country) }
@@ -171,7 +181,7 @@ private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -
     val scope = rememberCoroutineScope()
     val total = destinations.sumOf { it.connections }.coerceAtLeast(1)
 
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), state = listState) {
         item {
             Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.s)) {
                 Text(stringResource(R.string.map_title_sans), style = Warden.type.headline)
@@ -461,7 +471,7 @@ private fun AppFilter(
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
 ) {
-    if (apps.isEmpty()) return
+    // Always shown, even with nothing to pick, so the filter row doesn't jump when data arrives.
     val c = Warden.colors
     var open by rememberSaveable { mutableStateOf(false) }
     val any = selected.isNotEmpty()
@@ -471,7 +481,7 @@ private fun AppFilter(
                 .clip(RoundedCornerShape(50))
                 .background(if (any) c.primary else c.surface)
                 .border(1.dp, if (any) c.primary else c.outline, RoundedCornerShape(50))
-                .clickable(role = Role.Button) { open = true }
+                .clickable(enabled = apps.isNotEmpty(), role = Role.Button) { open = true }
                 .padding(start = if (any) Spacing.s else Spacing.l, end = Spacing.m, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s),

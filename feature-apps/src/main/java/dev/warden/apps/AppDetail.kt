@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -29,6 +30,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +38,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,17 +48,14 @@ import dev.warden.design.SectionLabel
 import dev.warden.design.BarSpacer
 import dev.warden.design.Spacing
 import dev.warden.design.Sparkline
-import dev.warden.design.StatSquare
+import dev.warden.design.CountUpText
 import dev.warden.design.Warden
 import dev.warden.design.formatBytes
 import dev.warden.design.Tile
-import dev.warden.design.ButtonKind
-import dev.warden.design.WardenButton
 import dev.warden.design.WardenSwitch
 import dev.warden.rules.AppRule
 import dev.warden.rules.AppRules
 import dev.warden.rules.TrackerSummary
-import dev.warden.rules.Trackers
 import dev.warden.rules.summarizeTrackers
 import dev.warden.design.ChoiceChips
 import dev.warden.rules.DomainChoice
@@ -98,7 +98,6 @@ internal fun AppDetail(
     }
     val connections = mine.count { it.kind != "dns" }
     val blocked = mine.count { it.blocked }
-    val bytes = mine.sumOf { it.bytesUp + it.bytesDown }
     val time = remember { DateFormat.getTimeInstance(DateFormat.MEDIUM) }
     val name = appLabel(uid)
 
@@ -118,93 +117,63 @@ internal fun AppDetail(
                 SectionLabel(stringResource(R.string.apps_title))
             }
         }
+        // Header: who, when, and the grade. The grade opens the report card.
         item {
+            var showReport by remember { mutableStateOf(false) }
+            val report = rememberReport(uid)
             Row(
                 Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.m),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.l),
             ) {
-                AppIcon(uid, appIcon, 64.dp, shared.icon(uid))
+                AppIcon(uid, appIcon, 56.dp, shared.icon(uid))
                 Column(Modifier.weight(1f)) {
                     Text(name, shared.name(uid), style = Warden.type.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (mine.isNotEmpty()) {
                         SectionLabel(stringResource(R.string.apps_last_seen, time.format(Date(mine.maxOf { it.time }))))
                     }
                 }
+                val badge = stringResource(R.string.report_badge, report.grade.letter)
+                GradeBadge(
+                    report.grade.letter,
+                    48.dp,
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable(role = Role.Button) { showReport = true }
+                        .semantics { contentDescription = badge },
+                )
+            }
+            if (showReport) ReportCardSheet(report, name, appIcon(uid)) { showReport = false }
+        }
+        // Three numbers, no boxes.
+        item {
+            Row(Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.l)) {
+                Number(connections, stringResource(R.string.apps_sq_connections), c.text, Modifier.weight(1f))
+                Number(domains.size, stringResource(R.string.apps_sq_domains), c.text, Modifier.weight(1f))
+                Number(blocked, stringResource(R.string.apps_sq_blocked), if (blocked > 0) c.blocked else c.text, Modifier.weight(1f))
             }
         }
         item {
-            var showReport by remember { mutableStateOf(false) }
-            WardenButton(
-                stringResource(R.string.report_open),
-                { showReport = true },
-                Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.m).fillMaxWidth(),
-                kind = ButtonKind.Tonal,
-                icon = DesignR.drawable.ph_shield_check,
-            )
-            if (showReport) ReportCardSheet(uid, name, appIcon(uid)) { showReport = false }
-        }
-        item { AccessCard(uid, name) }
-        // Summary first, in plain words.
-        item {
-            Text(
-                buildString {
-                    append(
-                        stringResource(
-                            R.string.apps_detail_summary,
-                            name,
-                            pluralStringResource(R.plurals.apps_connections, connections, connections),
-                            pluralStringResource(R.plurals.apps_domains, domains.size, domains.size),
-                        ),
-                    )
-                    append(' ')
-                    append(
-                        if (blocked == 0) {
-                            stringResource(R.string.apps_detail_none_blocked)
-                        } else {
-                            pluralStringResource(R.plurals.apps_detail_blocked, blocked, blocked)
-                        },
-                    )
-                    if (bytes > 0) append(' ').append(stringResource(R.string.apps_detail_data, formatBytes(bytes)))
-                },
-                Modifier.padding(horizontal = Spacing.xl),
-                style = Warden.type.body,
-                color = c.muted,
-            )
-        }
-        item {
-            val trackers = remember(domains) { summarizeTrackers(domains.map { it.name }) }
-            TrackersSection(trackers, domains)
-        }
-        item {
-            Row(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.l), horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                StatSquare(
-                    DesignR.drawable.ph_pulse,
-                    c.palette[0],
-                    connections,
-                    stringResource(R.string.apps_sq_connections),
-                    Modifier.weight(1f),
-                )
-                StatSquare(
-                    DesignR.drawable.ph_globe_hemisphere_west,
-                    c.palette[4],
-                    domains.size,
-                    stringResource(R.string.apps_sq_domains),
-                    Modifier.weight(1f),
-                )
-                StatSquare(DesignR.drawable.ph_prohibit, c.blocked, blocked, stringResource(R.string.apps_sq_blocked), Modifier.weight(1f))
-            }
-        }
-        item {
-            Column(Modifier.padding(horizontal = Spacing.xl), verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+            Column(
+                Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s),
+            ) {
                 SectionLabel(stringResource(R.string.apps_activity))
                 val activity = remember(mine) { mine.activity() }
                 if (activity.any { it > 0 }) {
-                    Sparkline(activity, c.accentInk, Modifier.fillMaxWidth().height(64.dp))
+                    Sparkline(activity, c.accentInk, Modifier.fillMaxWidth().height(56.dp))
                 } else {
                     Text(stringResource(R.string.apps_activity_none), style = Warden.type.body, color = c.muted)
                 }
             }
+        }
+        item {
+            SectionLabel(stringResource(R.string.apps_access_label), Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.s))
+            AccessCard(uid, name)
+        }
+        item {
+            val trackers = remember(domains) { summarizeTrackers(domains.map { it.name }) }
+            TrackersSection(trackers)
         }
         item {
             SectionLabel(
@@ -306,7 +275,7 @@ private fun AccessCard(uid: Int, name: String) {
     val c = Warden.colors
     val rules by AppRules.rules.collectAsState()
     val rule = rules[uid] ?: AppRule()
-    Tile(Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.l).fillMaxWidth()) {
+    Tile(Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.xl).fillMaxWidth()) {
         AccessRow(
             DesignR.drawable.ph_wifi_high,
             stringResource(R.string.apps_wifi),
@@ -390,42 +359,38 @@ internal fun DomainRuleChips(uid: Int, domain: String, modifier: Modifier = Modi
     )
 }
 
-/** "8 trackers from 4 companies", then each company with what it does and which domains. */
+/** "8 trackers from 4 companies", then one line per company with what it does. */
 @Composable
-private fun TrackersSection(t: TrackerSummary, domains: List<DomainGroup>) {
+private fun TrackersSection(t: TrackerSummary) {
     val c = Warden.colors
-    Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.l), verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+    Column(Modifier.padding(horizontal = Spacing.xl), verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
         SectionLabel(stringResource(R.string.apps_trackers))
-        Tile(Modifier.fillMaxWidth()) {
-            Text(
-                if (t.trackers == 0) {
-                    stringResource(R.string.apps_trackers_none)
-                } else {
-                    stringResource(
-                        R.string.apps_trackers_sentence,
-                        pluralStringResource(R.plurals.apps_n_trackers, t.trackers, t.trackers),
-                        pluralStringResource(R.plurals.apps_n_companies, t.companies, t.companies),
-                    )
-                },
-                style = Warden.type.title,
-            )
-            t.byCompany.forEach { (company, categories) ->
-                HorizontalDivider(color = c.outline)
-                val names = domains.map { it.name }.filter { Trackers.lookup(it)?.company == company }
-                Column(Modifier.fillMaxWidth().padding(vertical = Spacing.xs)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(company, Modifier.weight(1f), style = Warden.type.body)
-                        Text(categories.joinToString(" · "), style = Warden.type.label, color = c.muted)
-                    }
-                    Text(
-                        names.joinToString(", "),
-                        style = Warden.type.label,
-                        color = c.muted,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+        Text(
+            if (t.trackers == 0) {
+                stringResource(R.string.apps_trackers_none)
+            } else {
+                stringResource(
+                    R.string.apps_trackers_sentence,
+                    pluralStringResource(R.plurals.apps_n_trackers, t.trackers, t.trackers),
+                    pluralStringResource(R.plurals.apps_n_companies, t.companies, t.companies),
+                )
+            },
+            style = Warden.type.body,
+            color = if (t.trackers == 0) c.muted else c.text,
+        )
+        t.byCompany.forEach { (company, categories) ->
+            Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(company, Modifier.weight(1f), style = Warden.type.body)
+                Text(categories.joinToString(" · "), style = Warden.type.label, color = c.muted)
             }
         }
+    }
+}
+
+@Composable
+private fun Number(value: Int, label: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
+    Column(modifier) {
+        CountUpText(value, Warden.type.headline, color = color)
+        Text(label.uppercase(), style = Warden.type.caption, color = Warden.colors.muted)
     }
 }

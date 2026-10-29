@@ -66,4 +66,12 @@
         <item quantity="other">%d connections while the screen was off</item>
     </plurals>
     <string name="tool_quality_caption">DNS %1$d ms  ·  %2$d%% failed</string>
+    <string name="data_total">moved through Warden %1$s</string>
+    <string name="data_sent">Sent</string>
+    <string name="data_received">Received</string>
+    <string name="data_over_time">Over time</string>
+    <string name="data_by_app">Biggest apps</string>
+    <string name="data_other">Everything else</string>
+    <string name="data_all_apps">All apps</string>
+    <string name="data_chart_description">Data moved over time. The busiest period moved %1$s.</string>
 </resources>

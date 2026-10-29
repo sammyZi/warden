@@ -12,12 +12,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,12 +41,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import dev.warden.data.History
 import dev.warden.data.Range
-import dev.warden.design.ButtonKind
 import dev.warden.design.Spacing
 import dev.warden.design.Warden
 import dev.warden.design.WardenButton
@@ -56,18 +60,12 @@ import java.io.File
 import kotlin.math.roundToInt
 import dev.warden.design.R as DesignR
 
-/** Inputs to the grade, and the grade itself. The formula is documented in docs/report-card.md. */
-internal data class Grade(
-    val letter: String,
-    val score: Int,
-    val companies: Int,
-    val trackerShare: Float,
-    val screenOffShare: Float,
-)
-
-internal fun grade(companies: Int, trackerShare: Float, screenOffShare: Float): Grade {
-    val score = (100 - PER_COMPANY * minOf(companies, MAX_COMPANIES) - TRACKER_WEIGHT * trackerShare - SCREEN_OFF_WEIGHT * screenOffShare)
-        .roundToInt().coerceIn(0, 100)
+/** The grade and the penalties behind it. The formula is documented in docs/report-card.md. */
+internal data class Grade(val companies: Int, val trackerShare: Float, val screenOffShare: Float) {
+    val companyPenalty = PER_COMPANY * minOf(companies, MAX_COMPANIES)
+    val trackerPenalty = (TRACKER_WEIGHT * trackerShare).roundToInt()
+    val screenOffPenalty = (SCREEN_OFF_WEIGHT * screenOffShare).roundToInt()
+    val score = (100 - companyPenalty - trackerPenalty - screenOffPenalty).coerceIn(0, 100)
     val letter = when {
         score >= 90 -> "A"
         score >= 80 -> "B"
@@ -75,21 +73,20 @@ internal fun grade(companies: Int, trackerShare: Float, screenOffShare: Float): 
         score >= 50 -> "D"
         else -> "F"
     }
-    return Grade(letter, score, companies, trackerShare, screenOffShare)
 }
+
+internal fun grade(companies: Int, trackerShare: Float, screenOffShare: Float) = Grade(companies, trackerShare, screenOffShare)
 
 private const val PER_COMPANY = 9
 private const val MAX_COMPANIES = 6
 private const val TRACKER_WEIGHT = 30f
 private const val SCREEN_OFF_WEIGHT = 15f
 
-/** Bottom sheet with the card and a Share button that sends it as a PNG. Last 7 days of history. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** One app's last 7 days, graded. */
+internal class Report(val grade: Grade, val connections: Int, val blocked: Int, val companies: List<String>)
+
 @Composable
-internal fun ReportCardSheet(uid: Int, name: String, icon: ImageBitmap?, onDismiss: () -> Unit) {
-    val c = Warden.colors
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+internal fun rememberReport(uid: Int): Report {
     val domains by remember(uid) { History.appDomains(uid, Range.Week) }.collectAsState(emptyList())
     val all by remember { History.apps(Range.Week, limit = 500) }.collectAsState(emptyList())
     val off by remember { History.apps(Range.Week, screenOffOnly = true, limit = 500) }.collectAsState(emptyList())
@@ -98,15 +95,28 @@ internal fun ReportCardSheet(uid: Int, name: String, icon: ImageBitmap?, onDismi
     val trackers = summarizeTrackers(domains.map { it.domain })
     val events = domains.sumOf { it.count }.coerceAtLeast(1)
     val trackerHits = domains.filter { Trackers.lookup(it.domain) != null }.sumOf { it.count }
-    val connections = totals?.connections ?: 0
     val offShare = ((offTotals?.connections ?: 0) + (offTotals?.blocked ?: 0)).toFloat() /
         ((totals?.connections ?: 0) + (totals?.blocked ?: 0)).coerceAtLeast(1)
-    val g = grade(trackers.companies, trackerHits.toFloat() / events, offShare)
+    return Report(
+        grade(trackers.companies, trackerHits.toFloat() / events, offShare),
+        totals?.connections ?: 0,
+        totals?.blocked ?: 0,
+        trackers.byCompany.map { it.first },
+    )
+}
 
+/** Full-height sheet: the card, Share (as a PNG), then how this app's grade was worked out. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReportCardSheet(report: Report, name: String, icon: ImageBitmap?, onDismiss: () -> Unit) {
+    val c = Warden.colors
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val layer = rememberGraphicsLayer()
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.background) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = c.background) {
         Column(
-            Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.xl),
+            Modifier.verticalScroll(rememberScrollState()).padding(horizontal = Spacing.xl).padding(bottom = Spacing.xl),
             verticalArrangement = Arrangement.spacedBy(Spacing.l),
         ) {
             // The card is recorded into a layer so Share can export exactly what's on screen.
@@ -116,7 +126,7 @@ internal fun ReportCardSheet(uid: Int, name: String, icon: ImageBitmap?, onDismi
                     drawLayer(layer)
                 },
             ) {
-                Card(name, icon, g, connections, totals?.blocked ?: 0, trackers.byCompany.map { it.first })
+                Card(name, icon, report)
             }
             WardenButton(
                 stringResource(R.string.report_share),
@@ -128,23 +138,18 @@ internal fun ReportCardSheet(uid: Int, name: String, icon: ImageBitmap?, onDismi
                 },
                 Modifier.fillMaxWidth(),
             )
-            WardenButton(stringResource(R.string.report_formula), { openFormula(context) }, Modifier.fillMaxWidth(), kind = ButtonKind.Text)
+            Breakdown(report.grade)
         }
     }
 }
 
 /** The shareable card itself: always dark, so it looks the same wherever it's posted. */
 @Composable
-private fun Card(name: String, icon: ImageBitmap?, g: Grade, connections: Int, blocked: Int, companies: List<String>) {
+private fun Card(name: String, icon: ImageBitmap?, r: Report) {
     val ink = Color(0xFF0E0F0D)
-    val lime = Color(0xFFD8F23C)
     val paper = Color(0xFFF3F4EE)
     val muted = Color(0xFF9A9C97)
-    val gradeColor = when (g.letter) {
-        "A", "B" -> lime
-        "C" -> Color(0xFFF2BC45)
-        else -> Color(0xFFFF6B4A)
-    }
+    val g = r.grade
     Column(
         Modifier
             .fillMaxWidth()
@@ -156,33 +161,75 @@ private fun Card(name: String, icon: ImageBitmap?, g: Grade, connections: Int, b
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
             if (icon != null) Image(icon, null, Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)))
             Column(Modifier.weight(1f)) {
-                Text(name, style = Warden.type.title, color = paper, maxLines = 1)
+                Text(name, style = Warden.type.title, color = paper, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(stringResource(R.string.report_kicker).uppercase(), style = Warden.type.caption, color = muted)
             }
-            Box(Modifier.size(72.dp).background(gradeColor, CircleShape), contentAlignment = Alignment.Center) {
-                Text(g.letter, style = Warden.type.display.copy(fontSize = 40.sp, fontWeight = FontWeight.SemiBold), color = ink)
-            }
+            GradeBadge(g.letter, 72.dp)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
-            Stat(connections.toString(), pluralStringResource(R.plurals.report_connections, connections), paper, muted)
-            Stat(g.companies.toString(), pluralStringResource(R.plurals.report_companies, g.companies), paper, muted)
-            Stat(blocked.toString(), stringResource(R.string.report_blocked), paper, muted)
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+            val m = Modifier.weight(1f)
+            Stat(r.connections.toString(), pluralStringResource(R.plurals.report_connections, r.connections), paper, muted, m)
+            Stat(g.companies.toString(), pluralStringResource(R.plurals.report_companies, g.companies), paper, muted, m)
+            Stat(r.blocked.toString(), stringResource(R.string.report_blocked), paper, muted, m)
         }
-        if (companies.isNotEmpty()) {
-            Text(companies.take(MAX_LISTED).joinToString("  ·  "), style = Warden.type.body, color = paper)
+        if (r.companies.isNotEmpty()) {
+            Text(r.companies.take(MAX_LISTED).joinToString("  ·  "), style = Warden.type.body, color = paper)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-            Icon(painterResource(DesignR.drawable.ph_shield_check), null, Modifier.size(16.dp), tint = lime)
+            Icon(painterResource(DesignR.drawable.ph_shield_check), null, Modifier.size(16.dp), tint = Color(0xFFD8F23C))
             Text(stringResource(R.string.report_footer, g.score), style = Warden.type.caption, color = muted)
         }
     }
 }
 
+/** The letter in a filled circle: lime for A/B, amber for C, vermilion below. Same on any theme. */
 @Composable
-private fun Stat(value: String, label: String, paper: Color, muted: Color) {
-    Column {
+internal fun GradeBadge(letter: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    val fill = when (letter) {
+        "A", "B" -> Color(0xFFD8F23C)
+        "C" -> Color(0xFFF2BC45)
+        else -> Color(0xFFFF6B4A)
+    }
+    Box(modifier.size(size).background(fill, CircleShape), contentAlignment = Alignment.Center) {
+        Text(
+            letter,
+            style = Warden.type.display.copy(fontSize = (size.value * 0.55f).sp, fontWeight = FontWeight.SemiBold),
+            color = Color(0xFF0E0F0D),
+        )
+    }
+}
+
+@Composable
+private fun Stat(value: String, label: String, paper: Color, muted: Color, modifier: Modifier) {
+    Column(modifier) {
         Text(value, style = Warden.type.headline.tabular(), color = paper)
-        Text(label.uppercase(), style = Warden.type.caption, color = muted)
+        Text(label.uppercase(), style = Warden.type.caption, color = muted, maxLines = 2)
+    }
+}
+
+/** This app's grade worked out: start at 100, minus each penalty, then the letter bands. */
+@Composable
+private fun Breakdown(g: Grade) {
+    val c = Warden.colors
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+        Text(stringResource(R.string.report_formula), style = Warden.type.title)
+        Line(stringResource(R.string.report_start), "100")
+        HorizontalDivider(color = c.outline)
+        Line(pluralStringResource(R.plurals.report_line_companies, g.companies, g.companies), "−${g.companyPenalty}")
+        Line(stringResource(R.string.report_line_trackers, (g.trackerShare * 100).roundToInt()), "−${g.trackerPenalty}")
+        Line(stringResource(R.string.report_line_screen_off, (g.screenOffShare * 100).roundToInt()), "−${g.screenOffPenalty}")
+        HorizontalDivider(color = c.outline)
+        Line(stringResource(R.string.report_line_score, g.letter), g.score.toString(), strong = true)
+        Text(stringResource(R.string.report_bands), style = Warden.type.label, color = c.muted)
+    }
+}
+
+@Composable
+private fun Line(label: String, value: String, strong: Boolean = false) {
+    val style = if (strong) Warden.type.body.copy(fontWeight = FontWeight.Medium) else Warden.type.body
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+        Text(label, Modifier.weight(1f), style = style)
+        Text(value, style = style.tabular(), color = if (strong) Warden.colors.text else Warden.colors.muted)
     }
 }
 
@@ -199,12 +246,6 @@ private suspend fun share(context: Context, bitmap: Bitmap, name: String) {
         .putExtra(Intent.EXTRA_TEXT, context.getString(R.string.report_share_text, name))
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     context.startActivity(Intent.createChooser(send, null))
-}
-
-private fun openFormula(context: Context) {
-    context.startActivity(
-        Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/sammyZi/warden/blob/main/docs/report-card.md")),
-    )
 }
 
 private const val MAX_LISTED = 5

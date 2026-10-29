@@ -37,6 +37,8 @@ data class RangeStats(val blocked: Int, val connections: Int, val apps: Int, val
 
 data class Bucket(val bucket: Long, val count: Int)
 
+data class ByteBucket(val bucket: Long, val bytes: Long)
+
 data class AppTotals(
     val uid: Int,
     val connections: Int,
@@ -86,6 +88,12 @@ interface ConnectionDao {
 
     @Query("SELECT (time - :since) / :bucketMs AS bucket, COUNT(*) AS count FROM connections WHERE time >= :since GROUP BY bucket")
     fun activity(since: Long, bucketMs: Long): Flow<List<Bucket>>
+
+    @Query(
+        """SELECT (time - :since) / :bucketMs AS bucket, SUM(bytesUp + bytesDown) AS bytes FROM connections
+           WHERE time >= :since GROUP BY bucket""",
+    )
+    fun traffic(since: Long, bucketMs: Long): Flow<List<ByteBucket>>
 
     @Query(
         """SELECT uid, SUM(kind != 'dns') AS connections, SUM(blocked) AS blocked, COUNT(DISTINCT domain) AS domains,

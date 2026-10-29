@@ -82,6 +82,17 @@ object History {
         }
     }
 
+    /** Bytes moved per bucket across [range], oldest first, zero-filled. */
+    fun traffic(range: Range): Flow<List<Long>> {
+        val since = start(range)
+        val bucketMs = (System.currentTimeMillis() - since) / range.buckets + 1
+        return dao.traffic(since, bucketMs).map { list ->
+            val out = LongArray(range.buckets)
+            list.forEach { if (it.bucket in 0 until range.buckets) out[it.bucket.toInt()] = it.bytes }
+            out.toList()
+        }
+    }
+
     fun apps(range: Range, screenOffOnly: Boolean = false, limit: Int = 50): Flow<List<AppTotals>> =
         dao.apps(start(range), screenOffOnly, limit)
 

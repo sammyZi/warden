@@ -199,6 +199,7 @@ internal fun ToolScreen(
                 Modifier.padding(vertical = Spacing.s),
             )
         }
+        if (tool == Tool.Data && rows.isNotEmpty()) item { DataOverview(d.all, range, appLabel) }
         if (tool == Tool.Trackers) {
             item { TrackerCompanies(d.domains, range) }
         } else if (rows.isEmpty()) {
@@ -237,7 +238,12 @@ private fun AppRow(r: AppLine, appLabel: (Int) -> String, appIcon: (Int) -> Imag
             }
             Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(16.dp), tint = c.muted)
         }
-        if (r.tool != Tool.Quality) {
+        if (r.tool == Tool.Data && r.totals != null) {
+            // Same split as the overview: sent then received, the whole bar scaled to the biggest app.
+            Box(Modifier.fillMaxWidth().height(6.dp).background(c.surfaceVariant, RoundedCornerShape(3.dp))) {
+                SplitBar(r.totals.bytesUp, r.totals.bytesDown, Modifier.fillMaxWidth(share.coerceIn(0f, 1f)).fillMaxHeight())
+            }
+        } else if (r.tool != Tool.Quality) {
             Box(Modifier.fillMaxWidth().height(4.dp).background(c.surfaceVariant, RoundedCornerShape(2.dp))) {
                 Box(Modifier.fillMaxWidth(share.coerceIn(0f, 1f)).fillMaxHeight().background(hue, RoundedCornerShape(2.dp)))
             }

@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -118,6 +119,15 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
     val context = LocalContext.current
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     var openApp by rememberSaveable { mutableStateOf<Int?>(null) }
+    // Where an app's detail was opened from, so Back returns there instead of to the Apps list.
+    var returnTo by rememberSaveable { mutableStateOf<Tab?>(null) }
+    val openFrom: (Int) -> Unit = {
+        openApp = it
+        returnTo = tab
+        tab = Tab.Apps
+    }
+    // Each tab keeps its own saved state (open tool, country, scroll) while another tab is showing.
+    val tabStates = rememberSaveableStateHolder()
     BackHandler(enabled = tab != Tab.Home) { tab = Tab.Home }
 
     val running by Engine.running.collectAsState()
@@ -152,34 +162,37 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
                 },
                 label = "tabs",
             ) { t ->
-                when (t) {
-                    Tab.Home -> DashboardScreen(
-                        state = power,
-                        appLabel = apps::label,
-                        appIcon = apps::icon,
-                        onPowerClick = onPower,
-                        onOpenMap = { tab = Tab.Map },
-                        blocklistsOn = lists.values.any { it.enabled },
-                        onOpenSettings = { tab = Tab.Settings },
-                        onOpenApp = {
+                tabStates.SaveableStateProvider(t.name) {
+                    when (t) {
+                        Tab.Home -> DashboardScreen(
+                            state = power,
+                            appLabel = apps::label,
+                            appIcon = apps::icon,
+                            onPowerClick = onPower,
+                            onOpenMap = { tab = Tab.Map },
+                            blocklistsOn = lists.values.any { it.enabled },
+                            onOpenSettings = { tab = Tab.Settings },
+                            onOpenApp = openFrom,
+                        )
+                        Tab.Apps -> AppsScreen(events, apps::label, apps::icon, openApp, {
                             openApp = it
-                            tab = Tab.Apps
-                        },
-                    )
-                    Tab.Apps -> AppsScreen(events, apps::label, apps::icon, openApp, { openApp = it })
-                    Tab.Map -> MapScreen(apps::label, apps::icon, onOpenApp = {
-                        openApp = it
-                        tab = Tab.Apps
-                    })
-                    Tab.Log -> LogScreen(events, running, apps::label, apps::icon)
-                    Tab.Settings -> SettingsScreen(
-                        version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty(),
-                        themeMode = themeMode,
-                        onThemeMode = onThemeMode,
-                        onReplayIntro = onReplayIntro,
-                        appLabel = apps::label,
-                        appIcon = apps::icon,
-                    )
+                            val back = returnTo
+                            if (it == null && back != null) {
+                                returnTo = null
+                                tab = back
+                            }
+                        })
+                        Tab.Map -> MapScreen(apps::label, apps::icon, onOpenApp = openFrom)
+                        Tab.Log -> LogScreen(events, running, apps::label, apps::icon)
+                        Tab.Settings -> SettingsScreen(
+                            version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty(),
+                            themeMode = themeMode,
+                            onThemeMode = onThemeMode,
+                            onReplayIntro = onReplayIntro,
+                            appLabel = apps::label,
+                            appIcon = apps::icon,
+                        )
+                    }
                 }
             }
         }
@@ -189,6 +202,7 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
             Modifier.align(Alignment.BottomCenter).onSizeChanged { barHeight = with(density) { it.height.toDp() } },
         ) {
             if (it == Tab.Apps && tab == Tab.Apps) openApp = null // re-tap the tab to get back to the list
+            returnTo = null
             tab = it
         }
     }
