@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import dev.warden.design.IconBadge
 import dev.warden.design.Motion
 import dev.warden.design.SectionLabel
+import dev.warden.design.BarSpacer
 import dev.warden.design.Spacing
 import dev.warden.design.StatSquare
 import dev.warden.design.Warden
@@ -209,7 +210,7 @@ private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -
                 onOpen(d.country.iso)
             }
         }
-        item { Box(Modifier.height(Spacing.xxl)) }
+        item { BarSpacer() }
     }
 }
 
@@ -355,7 +356,7 @@ private fun CountryDetail(
             }
             HorizontalDivider(Modifier.padding(horizontal = Spacing.xl), color = c.outline)
         }
-        item { Box(Modifier.height(Spacing.xxl)) }
+        item { BarSpacer() }
     }
 }
 

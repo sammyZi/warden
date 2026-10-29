@@ -11,14 +11,21 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,6 +51,7 @@ import dev.warden.design.IconBadge
 import dev.warden.design.Motion
 import dev.warden.design.SectionLabel
 import dev.warden.design.SegmentedControl
+import dev.warden.design.BarSpacer
 import dev.warden.design.Spacing
 import dev.warden.design.StatSquare
 import dev.warden.design.ThemeMode
@@ -195,7 +203,7 @@ private fun SettingsHome(
             Credits()
             Text(stringResource(R.string.settings_version, version).uppercase(), style = Warden.type.caption, color = c.muted)
         }
-        Spacer(Modifier.height(Spacing.xxl))
+        BarSpacer()
     }
 }
 
@@ -266,14 +274,31 @@ private fun BlocklistRow(source: BlocklistSource, state: BlocklistState) {
                 )
                 else -> stringResource(R.string.settings_bl_license, source.license)
             }
-            val canTap = !state.busy && (state.failed || state.enabled)
-            Text(
-                status,
-                if (canTap) Modifier.clickable { Blocklists.refresh(source.id) }.padding(vertical = Spacing.xs) else Modifier,
-                style = Warden.type.label,
-                color = if (state.failed) c.blocked else c.muted,
-            )
+            Text(status, style = Warden.type.label, color = if (state.failed) c.blocked else c.muted)
         }
+        if (state.enabled || state.failed) RefreshButton(source.name, state.busy) { Blocklists.refresh(source.id) }
         WardenSwitch(state.enabled, { Blocklists.setEnabled(source.id, it) }, contentDescription = source.name)
+    }
+}
+
+/** Update one list now. Spins while that list downloads. */
+@Composable
+private fun RefreshButton(listName: String, busy: Boolean, onClick: () -> Unit) {
+    val c = Warden.colors
+    val spin = if (busy && !Warden.reduceMotion) {
+        rememberInfiniteTransition("refresh").animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), "spin")
+    } else {
+        null
+    }
+    Box(
+        Modifier.size(48.dp).clip(CircleShape).clickable(enabled = !busy, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painterResource(DesignR.drawable.ph_arrows_clockwise),
+            stringResource(R.string.settings_bl_refresh, listName),
+            Modifier.size(20.dp).graphicsLayer { rotationZ = spin?.value ?: 0f },
+            tint = if (busy) c.accentInk else c.muted,
+        )
     }
 }

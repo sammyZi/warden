@@ -9,6 +9,8 @@ coroutines = "1.11.0"
 # Pinned commit build from Maven Central; same pin Rethink ships (rethink-app/gradle.properties).
 firestack = "d3d530ea3e"
 junit = "4.13.2"
+# Backdrop blur for the glass tab bar (Apache-2.0); RenderEffect on API 31+, scrim fallback below.
+haze = "2.0.1"
 # detekt 2.x is still alpha (Oct 2026); 1.23.8 runs with its own embedded Kotlin.
 detekt = "1.23.8"
 
@@ -21,6 +23,8 @@ activity-compose = { module = "androidx.activity:activity-compose", version.ref 
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 firestack = { module = "com.celzero:firestack", version.ref = "firestack" }
 junit = { module = "junit:junit", version.ref = "junit" }
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+haze-glass = { module = "dev.chrisbanes.haze:haze-glass", version.ref = "haze" }
 detekt-formatting = { module = "io.gitlab.arturbosch.detekt:detekt-formatting", version.ref = "detekt" }
 
 [plugins]

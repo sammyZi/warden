@@ -50,6 +50,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -151,32 +152,70 @@ fun StatSquare(@DrawableRes icon: Int, hue: Color, value: Int, label: String, mo
     }
 }
 
-/** Thin line with a faint fill, drawn in left to right on first show. One hue only. */
+/**
+ * Activity line: a smoothed curve with a soft gradient beneath, faint guide lines, and a glowing dot
+ * on the latest value. Draws in left to right on first show. One hue only.
+ */
 @Composable
-fun Sparkline(values: List<Int>, color: Color, modifier: Modifier = Modifier) {
+fun Sparkline(
+    values: List<Int>,
+    color: Color,
+    modifier: Modifier = Modifier,
+    startLabel: String? = null,
+    endLabel: String? = null,
+) {
+    val c = Warden.colors
     val reduceMotion = Warden.reduceMotion
     val reveal = remember { Animatable(if (reduceMotion) 1f else 0f) }
     LaunchedEffect(Unit) { reveal.animateTo(1f, Motion.emphasized(900)) }
-    val path = remember { Path() }
-    Canvas(modifier) {
-        if (values.size < 2) return@Canvas
-        val max = (values.maxOrNull() ?: 0).coerceAtLeast(1).toFloat()
-        val step = size.width / (values.size - 1)
-        val inset = 2.dp.toPx()
-        fun y(v: Int) = inset + (size.height - 2 * inset) * (1f - v / max)
-        path.reset()
-        values.forEachIndexed { i, v -> if (i == 0) path.moveTo(0f, y(v)) else path.lineTo(i * step, y(v)) }
-        clipRect(right = size.width * reveal.value) {
-            val fill = Path().apply {
-                addPath(path)
-                lineTo(size.width, size.height)
-                lineTo(0f, size.height)
-                close()
+    val line = remember { Path() }
+    val fill = remember { Path() }
+    Column(modifier) {
+        Canvas(Modifier.fillMaxWidth().weight(1f)) {
+            if (values.size < 2) return@Canvas
+            val max = (values.maxOrNull() ?: 0).coerceAtLeast(1).toFloat()
+            val step = size.width / (values.size - 1)
+            val top = 10.dp.toPx()
+            val bottom = size.height - 2.dp.toPx()
+            fun y(v: Int) = top + (bottom - top) * (1f - v / max)
+
+            // Faint dashed guides at 0, 50% and 100% of the peak.
+            val dash = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 5.dp.toPx()))
+            listOf(top, (top + bottom) / 2, bottom).forEach {
+                drawLine(c.outline, Offset(0f, it), Offset(size.width, it), 1.dp.toPx(), pathEffect = dash)
             }
-            drawPath(fill, Brush.verticalGradient(listOf(color.copy(alpha = 0.22f), color.copy(alpha = 0f))))
-            drawPath(path, color, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-            val last = Offset((values.size - 1) * step, y(values.last()))
-            if (reveal.value == 1f) drawCircle(color, 3.5.dp.toPx(), last)
+
+            // Smooth curve: cubic segments with control points at the horizontal midpoints.
+            line.reset()
+            line.moveTo(0f, y(values[0]))
+            for (i in 1 until values.size) {
+                val x0 = (i - 1) * step
+                val x1 = i * step
+                val mid = (x0 + x1) / 2
+                line.cubicTo(mid, y(values[i - 1]), mid, y(values[i]), x1, y(values[i]))
+            }
+            fill.reset()
+            fill.addPath(line)
+            fill.lineTo(size.width, bottom)
+            fill.lineTo(0f, bottom)
+            fill.close()
+
+            clipRect(right = size.width * reveal.value) {
+                drawPath(fill, Brush.verticalGradient(listOf(color.copy(alpha = 0.32f), color.copy(alpha = 0f)), top, bottom))
+                drawPath(line, color, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+            if (reveal.value == 1f) {
+                val last = Offset((values.size - 1) * step, y(values.last()))
+                drawCircle(color.copy(alpha = 0.22f), 9.dp.toPx(), last)
+                drawCircle(color, 4.dp.toPx(), last)
+                drawCircle(c.background, 1.5.dp.toPx(), last)
+            }
+        }
+        if (startLabel != null || endLabel != null) {
+            Row(Modifier.fillMaxWidth().padding(top = Spacing.xs)) {
+                Text(startLabel.orEmpty(), Modifier.weight(1f), style = Warden.type.caption, color = c.muted)
+                Text(endLabel.orEmpty(), style = Warden.type.caption, color = c.muted)
+            }
         }
     }
 }

@@ -50,5 +50,7 @@ dependencies {
     implementation(project(":feature-logs"))
     implementation(project(":feature-settings"))
     implementation(libs.activity.compose)
+    implementation(libs.haze)
+    implementation(libs.haze.glass)
     debugImplementation(libs.compose.ui.tooling)
 }

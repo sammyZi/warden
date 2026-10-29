@@ -26,6 +26,7 @@
 
     <string name="settings_blocklists">Blocklists</string>
     <string name="settings_blocklists_note">Downloaded from each publisher, refreshed weekly on Wi-Fi.</string>
+    <string name="settings_bl_refresh">Update %1$s now</string>
     <string name="settings_bl_downloading">Downloading…</string>
     <string name="settings_bl_failed">Couldn\'t download · tap to retry</string>
     <string name="settings_bl_entries">%1$s domains · %2$s</string>

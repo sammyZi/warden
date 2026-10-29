@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import dev.warden.design.EmptyState
 import dev.warden.design.IconBadge
 import dev.warden.design.SectionLabel
+import dev.warden.design.BarSpacer
 import dev.warden.design.Spacing
 import dev.warden.design.Warden
 import dev.warden.rules.AppRule
@@ -133,7 +133,7 @@ internal fun RulesScreen(appLabel: (Int) -> String, appIcon: (Int) -> ImageBitma
                 ) { Rules.remove(key) }
             }
         }
-        item { Box(Modifier.height(Spacing.xxl)) }
+        item { BarSpacer() }
     }
 }
 

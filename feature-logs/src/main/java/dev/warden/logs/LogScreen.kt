@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import dev.warden.design.EmptyState
 import dev.warden.design.FilterChip
 import dev.warden.design.IconBadge
+import dev.warden.design.BarSpacer
 import dev.warden.design.Spacing
 import dev.warden.design.Warden
 import dev.warden.design.formatBytes
@@ -175,6 +176,7 @@ fun LogScreen(
             }
             HorizontalDivider(Modifier.padding(start = Spacing.xl + 36.dp + Spacing.m), color = c.outline)
         }
+        item { BarSpacer() }
     }
 }
 

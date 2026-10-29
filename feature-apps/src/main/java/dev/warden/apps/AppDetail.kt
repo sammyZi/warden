@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.warden.design.Motion
 import dev.warden.design.SectionLabel
+import dev.warden.design.BarSpacer
 import dev.warden.design.Spacing
 import dev.warden.design.Sparkline
 import dev.warden.design.StatSquare
@@ -193,7 +194,7 @@ internal fun AppDetail(
         }
         val most = domains.maxOfOrNull { it.events.size } ?: 1
         items(domains, key = { it.name }) { d -> DomainRow(uid, d, most, time) }
-        item { Box(Modifier.height(Spacing.xxl)) }
+        item { BarSpacer() }
     }
 }
 

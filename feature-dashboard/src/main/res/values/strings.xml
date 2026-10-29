@@ -1,4 +1,5 @@
 <resources>
+    <string name="dashboard_title">Warden</string>
     <string name="dashboard_off_detail">Turn it on to see who your apps talk to. Nothing leaves this phone.</string>
     <string name="dashboard_on_detail">Every app\'s connections pass through Warden, on this phone only.</string>
     <string name="dashboard_off">Protection is off</string>
@@ -11,6 +12,8 @@
     <string name="dashboard_sq_apps">Apps</string>
     <string name="dashboard_sq_domains">Domains</string>
     <string name="dashboard_activity">Activity · last 5 min</string>
+    <string name="dashboard_activity_start">5 min ago</string>
+    <string name="dashboard_activity_end">Now</string>
     <string name="dashboard_activity_none">Nothing has connected in the last five minutes.</string>
     <string name="dashboard_lists_title">Turn on a blocklist</string>
     <string name="dashboard_lists_body">Warden only blocks what\'s on a list. Pick one in Settings.</string>

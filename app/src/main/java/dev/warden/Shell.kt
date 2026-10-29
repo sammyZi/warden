@@ -45,7 +45,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,6 +71,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.warden.apps.AppsScreen
 import dev.warden.dashboard.DashboardScreen
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazePerformanceMode
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.hazeGlass
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import dev.warden.design.LocalBarInset
 import dev.warden.design.Motion
 import dev.warden.design.PowerState
 import dev.warden.design.Radii
@@ -114,70 +124,92 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
     val apps = remember { AppInfo(context.packageManager, context) }
     val reduceMotion = Warden.reduceMotion
 
-    Column(Modifier.fillMaxSize()) {
-        AnimatedContent(
-            tab,
-            Modifier.weight(1f).statusBarsPadding(),
-            transitionSpec = {
-                if (reduceMotion) {
-                    ContentTransform(EnterTransition.None, ExitTransition.None)
-                } else {
-                    // Sideways, in the direction of travel; the outgoing screen drifts a third for depth.
-                    val dir = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                    (slideInHorizontally(Motion.emphasized(Motion.LONG)) { dir * it } + fadeIn(Motion.emphasized(Motion.LONG)))
-                        .togetherWith(
-                            slideOutHorizontally(Motion.emphasized(Motion.LONG)) { -dir * it / 3 } +
-                                fadeOut(Motion.emphasized(Motion.MEDIUM)),
-                        )
-                }
-            },
-            label = "tabs",
-        ) { t ->
-            when (t) {
-                Tab.Home -> DashboardScreen(
-                    state = power,
-                    events = events,
-                    appLabel = apps::label,
-                    appIcon = apps::icon,
-                    onPowerClick = onPower,
-                    onOpenMap = { tab = Tab.Map },
-                    blocklistsOn = lists.values.any { it.enabled },
-                    onOpenSettings = { tab = Tab.Settings },
-                    onOpenApp = {
+    // Content fills the screen and scrolls under a floating liquid-glass tab bar.
+    val haze = rememberHazeState()
+    val density = LocalDensity.current
+    var barHeight by remember { mutableStateOf(0.dp) }
+    Box(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalBarInset provides barHeight) {
+            AnimatedContent(
+                tab,
+                Modifier.fillMaxSize().hazeSource(haze).statusBarsPadding(),
+                transitionSpec = {
+                    if (reduceMotion) {
+                        ContentTransform(EnterTransition.None, ExitTransition.None)
+                    } else {
+                        // Sideways, in the direction of travel; the outgoing screen drifts a third for depth.
+                        val dir = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                        (slideInHorizontally(Motion.emphasized(Motion.LONG)) { dir * it } + fadeIn(Motion.emphasized(Motion.LONG)))
+                            .togetherWith(
+                                slideOutHorizontally(Motion.emphasized(Motion.LONG)) { -dir * it / 3 } +
+                                    fadeOut(Motion.emphasized(Motion.MEDIUM)),
+                            )
+                    }
+                },
+                label = "tabs",
+            ) { t ->
+                when (t) {
+                    Tab.Home -> DashboardScreen(
+                        state = power,
+                        events = events,
+                        appLabel = apps::label,
+                        appIcon = apps::icon,
+                        onPowerClick = onPower,
+                        onOpenMap = { tab = Tab.Map },
+                        blocklistsOn = lists.values.any { it.enabled },
+                        onOpenSettings = { tab = Tab.Settings },
+                        onOpenApp = {
+                            openApp = it
+                            tab = Tab.Apps
+                        },
+                    )
+                    Tab.Apps -> AppsScreen(events, apps::label, apps::icon, openApp, { openApp = it })
+                    Tab.Map -> MapScreen(events, apps::label, apps::icon, onOpenApp = {
                         openApp = it
                         tab = Tab.Apps
-                    },
-                )
-                Tab.Apps -> AppsScreen(events, apps::label, apps::icon, openApp, { openApp = it })
-                Tab.Map -> MapScreen(events, apps::label, apps::icon, onOpenApp = {
-                    openApp = it
-                    tab = Tab.Apps
-                })
-                Tab.Log -> LogScreen(events, running, apps::label, apps::icon)
-                Tab.Settings -> SettingsScreen(
-                    version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty(),
-                    themeMode = themeMode,
-                    onThemeMode = onThemeMode,
-                    onReplayIntro = onReplayIntro,
-                    appLabel = apps::label,
-                    appIcon = apps::icon,
-                )
+                    })
+                    Tab.Log -> LogScreen(events, running, apps::label, apps::icon)
+                    Tab.Settings -> SettingsScreen(
+                        version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty(),
+                        themeMode = themeMode,
+                        onThemeMode = onThemeMode,
+                        onReplayIntro = onReplayIntro,
+                        appLabel = apps::label,
+                        appIcon = apps::icon,
+                    )
+                }
             }
         }
-        BottomBar(tab) {
+        BottomBar(
+            tab,
+            haze,
+            Modifier.align(Alignment.BottomCenter).onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+        ) {
             if (it == Tab.Apps && tab == Tab.Apps) openApp = null // re-tap the tab to get back to the list
             tab = it
         }
     }
 }
 
-/** Tab bar: one lime pill springs to the selected tab; selected icon and label turn ink on it. */
+/**
+ * Floating liquid-glass tab bar: content refracts and blurs through it (Haze glass, GPU RenderEffect,
+ * Balanced performance mode; a plain translucent fallback where the platform can't). One lime pill
+ * springs to the selected tab.
+ */
 @Composable
-private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit) {
+private fun BottomBar(current: Tab, haze: HazeState, modifier: Modifier, onSelect: (Tab) -> Unit) {
     val c = Warden.colors
-    Column(Modifier.background(c.background).navigationBarsPadding()) {
-        HorizontalDivider(color = c.outline)
-        BoxWithConstraints(Modifier.fillMaxWidth().height(72.dp).padding(horizontal = Spacing.s, vertical = Spacing.s)) {
+    val shape = RoundedCornerShape(Radii.large)
+    val style = remember { GlassStyle { shape(shape) } }
+    Box(modifier.navigationBarsPadding().padding(horizontal = Spacing.l, vertical = Spacing.s)) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .height(68.dp)
+                .clip(shape)
+                .hazeGlass(HazeInput.Backdrop(haze), style, HazePerformanceMode.Balanced)
+                .padding(Spacing.s),
+        ) {
             val itemWidth = maxWidth / Tab.entries.size
             val x by animateDpAsState(
                 itemWidth * current.ordinal,

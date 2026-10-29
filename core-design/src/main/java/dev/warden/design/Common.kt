@@ -11,6 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -83,4 +86,13 @@ fun Modifier.staggerIn(index: Int, enabled: Boolean): Modifier {
         alpha = progress.value
         translationY = (1f - progress.value) * 12.dp.toPx()
     }
+}
+
+/** Height of the floating tab bar (incl. system nav inset); content scrolls under it. */
+val LocalBarInset = staticCompositionLocalOf { 0.dp }
+
+/** Last item of every scrolling screen, so the end of the content clears the floating bar. */
+@Composable
+fun BarSpacer() {
+    Spacer(Modifier.height(LocalBarInset.current + Spacing.l))
 }

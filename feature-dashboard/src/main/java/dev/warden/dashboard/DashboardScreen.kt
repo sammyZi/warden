@@ -46,6 +46,7 @@ import dev.warden.design.PowerButton
 import dev.warden.design.PowerState
 import dev.warden.design.Radii
 import dev.warden.design.SectionLabel
+import dev.warden.design.BarSpacer
 import dev.warden.design.Spacing
 import dev.warden.design.Sparkline
 import dev.warden.design.StatSquare
@@ -78,7 +79,8 @@ fun DashboardScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.xl),
     ) {
-        Spacer(Modifier.height(Spacing.s))
+        // Same header slot as every other tab.
+        Text(stringResource(R.string.dashboard_title), Modifier.padding(top = Spacing.s, bottom = Spacing.s), style = Warden.type.headline)
         Text(
             stringResource(if (state == PowerState.On) R.string.dashboard_on_detail else R.string.dashboard_off_detail),
             style = Warden.type.body,
@@ -133,7 +135,13 @@ fun DashboardScreen(
         SectionLabel(stringResource(R.string.dashboard_activity))
         Spacer(Modifier.height(Spacing.s))
         if (stats.activity.any { it > 0 }) {
-            Sparkline(stats.activity, c.accentInk, Modifier.fillMaxWidth().height(72.dp))
+            Sparkline(
+                stats.activity,
+                c.accentInk,
+                Modifier.fillMaxWidth().height(120.dp),
+                startLabel = stringResource(R.string.dashboard_activity_start),
+                endLabel = stringResource(R.string.dashboard_activity_end),
+            )
         } else {
             Text(stringResource(R.string.dashboard_activity_none), style = Warden.type.body, color = c.muted)
         }
@@ -174,7 +182,7 @@ fun DashboardScreen(
                 Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(18.dp), tint = c.muted)
             }
         }
-        Spacer(Modifier.height(Spacing.xxl))
+        BarSpacer()
     }
 }
 
