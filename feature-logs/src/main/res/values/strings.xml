@@ -11,4 +11,8 @@
     <string name="log_empty_body">Turn Warden on and every connection shows up here as it happens.</string>
     <string name="log_filtered_title">Nothing here yet</string>
     <string name="log_filtered_body">No recent events match this filter.</string>
+    <string name="rule_default">Default</string>
+    <string name="rule_allow_here">Allow for this app</string>
+    <string name="rule_block_here">Block for this app</string>
+    <string name="rule_block_everywhere">Block everywhere</string>
 </resources>

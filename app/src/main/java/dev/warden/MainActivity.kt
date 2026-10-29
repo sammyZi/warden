@@ -24,8 +24,7 @@ import dev.warden.design.Motion
 import dev.warden.design.ThemeMode
 import dev.warden.design.Warden
 import dev.warden.design.WardenTheme
-import dev.warden.rules.AppRules
-import dev.warden.rules.Blocklists
+import dev.warden.rules.Rules
 
 class MainActivity : ComponentActivity() {
 
@@ -33,8 +32,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         preferHighestRefreshRate()
-        Blocklists.init(this)
-        AppRules.init(this)
+        Rules.init(this)
         // ponytail: one boolean in SharedPreferences; DataStore arrives with real settings in M7.
         val prefs = getSharedPreferences("warden", MODE_PRIVATE)
 

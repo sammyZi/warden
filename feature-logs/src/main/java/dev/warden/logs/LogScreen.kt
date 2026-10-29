@@ -7,6 +7,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +48,10 @@ import dev.warden.design.formatBytes
 import dev.warden.design.staggerIn
 import dev.warden.design.tabular
 import dev.warden.engine.NetEvent
+import androidx.compose.runtime.collectAsState
+import dev.warden.design.ChoiceChips
+import dev.warden.rules.DomainChoice
+import dev.warden.rules.Rules
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
@@ -114,10 +119,12 @@ fun LogScreen(
             }
         }
         itemsIndexed(shown, key = { _, e -> e.id }) { index, e ->
+            var open by rememberSaveable(e.id) { mutableStateOf(false) }
             Row(
                 Modifier
                     .staggerIn(index, firstAppearance)
                     .fillMaxWidth()
+                    .clickable(enabled = e.domain != null) { open = !open }
                     .heightIn(min = 64.dp)
                     .padding(horizontal = Spacing.xl, vertical = Spacing.m),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.m),
@@ -158,6 +165,14 @@ fun LogScreen(
                     )
                 }
             }
+            val domain = e.domain
+            if (open && domain != null) {
+                DomainRuleChips(
+                    e.uid,
+                    domain,
+                    Modifier.padding(start = Spacing.xl + 36.dp + Spacing.m, end = Spacing.xl, bottom = Spacing.m),
+                )
+            }
             HorizontalDivider(Modifier.padding(start = Spacing.xl + 36.dp + Spacing.m), color = c.outline)
         }
     }
@@ -176,3 +191,25 @@ private fun LiveDot(running: Boolean) {
 }
 
 private const val FIRST_APPEARANCE_MS = 600L
+
+/** Block or allow this domain for this app, or everywhere. Takes effect for new connections. */
+@Composable
+internal fun DomainRuleChips(uid: Int, domain: String, modifier: Modifier = Modifier) {
+    val rules by Rules.domains.collectAsState()
+    val current = remember(rules, uid, domain) { Rules.choice(uid, domain) }
+    ChoiceChips(
+        DomainChoice.entries.map {
+            stringResource(
+                when (it) {
+                    DomainChoice.Default -> R.string.rule_default
+                    DomainChoice.AllowHere -> R.string.rule_allow_here
+                    DomainChoice.BlockHere -> R.string.rule_block_here
+                    DomainChoice.BlockEverywhere -> R.string.rule_block_everywhere
+                },
+            )
+        },
+        current.ordinal,
+        { Rules.choose(uid, domain, DomainChoice.entries[it]) },
+        modifier,
+    )
+}

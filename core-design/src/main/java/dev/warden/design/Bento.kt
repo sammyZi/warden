@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -166,5 +167,13 @@ fun Sparkline(values: List<Int>, color: Color, modifier: Modifier = Modifier) {
             val last = Offset((values.size - 1) * step, y(values.last()))
             if (reveal.value == 1f) drawCircle(color, 3.5.dp.toPx(), last)
         }
+    }
+}
+
+/** Mutually exclusive options as a wrapping row of chips. */
+@Composable
+fun ChoiceChips(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+        options.forEachIndexed { i, label -> FilterChip(label, i == selected, { onSelect(i) }) }
     }
 }

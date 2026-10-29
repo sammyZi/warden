@@ -50,6 +50,9 @@ import dev.warden.design.Tile
 import dev.warden.design.WardenSwitch
 import dev.warden.rules.AppRule
 import dev.warden.rules.AppRules
+import dev.warden.design.ChoiceChips
+import dev.warden.rules.DomainChoice
+import dev.warden.rules.Rules
 import androidx.compose.runtime.collectAsState
 import dev.warden.design.tabular
 import dev.warden.engine.NetEvent
@@ -188,14 +191,14 @@ internal fun AppDetail(
             )
         }
         val most = domains.maxOfOrNull { it.events.size } ?: 1
-        items(domains, key = { it.name }) { d -> DomainRow(d, most, time) }
+        items(domains, key = { it.name }) { d -> DomainRow(uid, d, most, time) }
         item { Box(Modifier.height(Spacing.xxl)) }
     }
 }
 
 /** A domain with its share bar; tap to expand its recent connections in place. */
 @Composable
-private fun DomainRow(d: DomainGroup, most: Int, time: DateFormat) {
+private fun DomainRow(uid: Int, d: DomainGroup, most: Int, time: DateFormat) {
     val c = Warden.colors
     var open by rememberSaveable(d.name) { mutableStateOf(false) }
     val turn by animateFloatAsState(if (open) 90f else 0f, Motion.emphasized(Motion.MEDIUM), label = "caret")
@@ -245,6 +248,7 @@ private fun DomainRow(d: DomainGroup, most: Int, time: DateFormat) {
             )
         }
         if (open) {
+            DomainRuleChips(uid, d.name)
             d.events.take(MAX_EXPANDED).forEach { e ->
                 Text(
                     listOfNotNull(
@@ -312,4 +316,26 @@ private fun AccessRow(icon: Int, label: String, allowed: Boolean, description: S
         }
         WardenSwitch(allowed, onChange, contentDescription = description)
     }
+}
+
+/** Block or allow this domain for this app, or everywhere. Takes effect for new connections. */
+@Composable
+internal fun DomainRuleChips(uid: Int, domain: String, modifier: Modifier = Modifier) {
+    val rules by Rules.domains.collectAsState()
+    val current = remember(rules, uid, domain) { Rules.choice(uid, domain) }
+    ChoiceChips(
+        DomainChoice.entries.map {
+            stringResource(
+                when (it) {
+                    DomainChoice.Default -> R.string.rule_default
+                    DomainChoice.AllowHere -> R.string.rule_allow_here
+                    DomainChoice.BlockHere -> R.string.rule_block_here
+                    DomainChoice.BlockEverywhere -> R.string.rule_block_everywhere
+                },
+            )
+        },
+        current.ordinal,
+        { Rules.choose(uid, domain, DomainChoice.entries[it]) },
+        modifier,
+    )
 }

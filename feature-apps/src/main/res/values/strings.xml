@@ -37,7 +37,7 @@
     <string name="apps_sq_blocked">Blocked</string>
     <string name="apps_activity">Activity · last 5 min</string>
     <string name="apps_activity_none">Nothing in the last five minutes.</string>
-    <string name="apps_domains_label">Domains · tap one to see its connections</string>
+    <string name="apps_domains_label">Domains · tap one to see connections and block it</string>
     <string name="apps_expanded">Expanded</string>
     <string name="apps_collapsed">Collapsed</string>
     <string name="apps_blocked_word">Blocked</string>
@@ -47,4 +47,8 @@
     <string name="apps_cellular_for">Mobile data access for %1$s</string>
     <string name="apps_allowed">Allowed</string>
     <string name="apps_more">+%1$d more</string>
+    <string name="rule_default">Default</string>
+    <string name="rule_allow_here">Allow for this app</string>
+    <string name="rule_block_here">Block for this app</string>
+    <string name="rule_block_everywhere">Block everywhere</string>
 </resources>

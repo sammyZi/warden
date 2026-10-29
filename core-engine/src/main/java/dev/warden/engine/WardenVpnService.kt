@@ -28,8 +28,7 @@ import com.celzero.firestack.intra.Mark
 import com.celzero.firestack.intra.PreMark
 import com.celzero.firestack.intra.Tunnel
 import com.celzero.firestack.settings.Settings
-import dev.warden.rules.AppRules
-import dev.warden.rules.Blocklists
+import dev.warden.rules.Rules
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -66,8 +65,7 @@ class WardenVpnService : VpnService(), Bridge {
 
     override fun onCreate() {
         super.onCreate()
-        Blocklists.init(this) // always-on VPN can start us before any activity
-        AppRules.init(this)
+        Rules.init(this) // always-on VPN can start us before any activity
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -230,7 +228,7 @@ class WardenVpnService : VpnService(), Bridge {
         val cid = ids.incrementAndGet().toString()
         val toOurDns = host(dst) == DNS4 || host(dst) == DNS6
         val names = (domains.split(',') + probableDomains.split(',')).map(::normalize).filter { it.isNotEmpty() }
-        val blocked = !toOurDns && (AppRules.blocks(uid, cellular) || names.any(::isBlocked))
+        val blocked = !toOurDns && Rules.blocks(uid, names, cellular)
         if (!toOurDns) {
             Engine.record(
                 NetEvent(cid, System.currentTimeMillis(), uid, protocolName(protocol), names.firstOrNull(), dst, blocked),
@@ -263,8 +261,7 @@ class WardenVpnService : VpnService(), Bridge {
     override fun onQuery(who: String, uid: String, domain: String, qtyp: Long): DNSOpts = DNSOpts().apply {
         this.uid = uid
         ipcsv = ""
-        val appBlocked = uid.toIntOrNull()?.let { AppRules.blocks(it, cellular) } == true
-        tidcsv = if (appBlocked || isBlocked(normalize(domain))) Backend.BlockAll else dnsTransport
+        tidcsv = if (Rules.blocks(uid.toIntOrNull() ?: UNKNOWN_UID, listOf(normalize(domain)), cellular)) Backend.BlockAll else dnsTransport
     }
 
     override fun onResponse(s: DNSSummary?) {
@@ -278,7 +275,7 @@ class WardenVpnService : VpnService(), Bridge {
                 kind = "dns",
                 domain = name,
                 target = s.rData.ifEmpty { "no answer" },
-                blocked = isBlocked(name) || s.uid.toIntOrNull()?.let { AppRules.blocks(it, cellular) } == true,
+                blocked = Rules.blocks(s.uid.toIntOrNull() ?: UNKNOWN_UID, listOf(name), cellular),
             ),
         )
     }
@@ -320,8 +317,6 @@ class WardenVpnService : VpnService(), Bridge {
         private const val DNS4 = "10.111.222.3"
         private const val GATEWAY6 = "fd66:f83a:c650::1"
         private const val DNS6 = "fd66:f83a:c650::3"
-
-        internal fun isBlocked(name: String) = Blocklists.isBlocked(name)
 
         private fun normalize(name: String) = name.trim().trimEnd('.').lowercase()
 
