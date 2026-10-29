@@ -23,6 +23,7 @@
     <string name="onb_battery_title">Keep Warden running</string>
     <string name="onb_battery_body">Some phones, including %1$s, stop background apps to save battery. In App info, open Battery and choose Unrestricted so protection doesn\'t quietly switch off.</string>
 
+    <string name="onb_blocked">Blocked</string>
     <string name="onb_next">Continue</string>
     <string name="onb_skip">Skip intro</string>
     <string name="onb_vpn_action">Allow VPN</string>

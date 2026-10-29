@@ -557,3 +557,29 @@ private fun PickerRow(label: String, icon: ImageBitmap?, count: Int?, selected: 
         if (selected) Icon(painterResource(DesignR.drawable.ph_check), null, Modifier.size(18.dp), tint = c.accentInk)
     }
 }
+
+/**
+ * The real globe with made-up traffic, for onboarding: arcs from the user's country to a few common
+ * destinations, two of them blocked. Same renderer and offline data as the Map tab.
+ */
+@Composable
+fun SampleGlobe(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val geo by produceState<Geo?>(null) { value = withContext(Dispatchers.IO) { loadGeo(context) } }
+    val g = geo ?: return Box(modifier)
+    val home = remember(g) { homeCountry(context)?.let(g::country) }
+    val destinations = remember(g) {
+        SAMPLE.mapNotNull { (iso, count, blocked) ->
+            g.country(iso)?.let { country ->
+                Destination(country, List(count) { i -> NetEvent("s$iso$i", 0L, 0, "tcp", null, "", i < blocked) })
+            }
+        }
+    }
+    val camera = remember(g) { GlobeCamera(home?.lat ?: DEFAULT_LAT, home?.lon ?: 0f) }
+    Globe(g, home, destinations, null, camera, onSelect = {}, description = "", modifier = modifier)
+}
+
+private val SAMPLE = listOf(
+    Triple("US", 42, 6), Triple("DE", 18, 0), Triple("SG", 15, 2), Triple("IE", 12, 0),
+    Triple("JP", 9, 0), Triple("GB", 7, 0), Triple("NL", 5, 0),
+)

@@ -12,6 +12,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -87,34 +88,47 @@ fun LogScreen(
     }
     val time = remember { DateFormat.getTimeInstance(DateFormat.MEDIUM) }
 
-    LazyColumn(modifier.fillMaxSize()) {
-        item {
-            Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.s)) {
-                Text(stringResource(R.string.log_title), style = Warden.type.headline)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                    LiveDot(running)
-                    Text(
-                        stringResource(if (running) R.string.log_live else R.string.log_paused, events.size, blocked).uppercase(),
-                        style = Warden.type.caption.tabular(),
-                        color = c.muted,
-                    )
-                }
+    // Title, live line and filters stay put; only the stream below scrolls.
+    Column(modifier.fillMaxSize()) {
+        Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.s)) {
+            Text(stringResource(R.string.log_title), style = Warden.type.headline)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                LiveDot(running)
+                Text(
+                    stringResource(if (running) R.string.log_live else R.string.log_paused, events.size, blocked).uppercase(),
+                    style = Warden.type.caption.tabular(),
+                    color = c.muted,
+                )
             }
         }
-        item {
-            Row(
-                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.xl, vertical = Spacing.s),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-            ) {
-                Filter.entries.forEach { FilterChip(stringResource(it.label), filter == it, { filter = it }) }
-            }
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.xl, vertical = Spacing.s),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+        ) {
+            Filter.entries.forEach { FilterChip(stringResource(it.label), filter == it, { filter = it }) }
         }
+        HorizontalDivider(color = c.outline)
+        LogList(shown, events.isEmpty(), firstAppearance, time, appLabel, appIcon)
+    }
+}
+
+@Composable
+private fun ColumnScope.LogList(
+    shown: List<NetEvent>,
+    noEvents: Boolean,
+    firstAppearance: Boolean,
+    time: DateFormat,
+    appLabel: (Int) -> String,
+    appIcon: (Int) -> ImageBitmap?,
+) {
+    val c = Warden.colors
+    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
         if (shown.isEmpty()) {
             item {
                 EmptyState(
                     DesignR.drawable.ph_pulse_light,
-                    stringResource(if (events.isEmpty()) R.string.log_empty_title else R.string.log_filtered_title),
-                    stringResource(if (events.isEmpty()) R.string.log_empty_body else R.string.log_filtered_body),
+                    stringResource(if (noEvents) R.string.log_empty_title else R.string.log_filtered_title),
+                    stringResource(if (noEvents) R.string.log_empty_body else R.string.log_filtered_body),
                     Modifier.fillMaxWidth(),
                 )
             }

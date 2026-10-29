@@ -165,9 +165,16 @@ private fun RuleRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
         leading()
-        Column(Modifier.weight(1f)) {
-            Text(title, style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // Tag rides beside the title; the caption gets its own line (and a second if it needs one).
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                Text(
+                    title,
+                    Modifier.weight(1f, fill = false),
+                    style = Warden.type.body,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text(
                     tag.uppercase(),
                     Modifier
@@ -175,9 +182,10 @@ private fun RuleRow(
                         .padding(horizontal = Spacing.s, vertical = 2.dp),
                     style = Warden.type.caption,
                     color = tagColor,
+                    maxLines = 1,
                 )
-                Text(caption, style = Warden.type.label, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            Text(caption, style = Warden.type.label, color = c.muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Box(
             Modifier.heightIn(min = 48.dp).clickable(onClick = onRemove).padding(horizontal = Spacing.s),

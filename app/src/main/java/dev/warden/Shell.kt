@@ -217,7 +217,7 @@ private fun BottomBar(current: Tab, haze: HazeState, modifier: Modifier, onSelec
                 .fillMaxWidth()
                 .height(68.dp)
                 .clip(shape)
-                .hazeBlur(HazeInput.Backdrop(haze), style, HazePerformanceMode.Balanced)
+                .hazeBlur(HazeInput.Sources(haze), style, HazePerformanceMode.Balanced)
                 .border(1.dp, c.outline.copy(alpha = 0.6f), shape)
                 .padding(Spacing.s),
         ) {
