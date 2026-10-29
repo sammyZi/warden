@@ -28,6 +28,7 @@ import com.celzero.firestack.intra.Mark
 import com.celzero.firestack.intra.PreMark
 import com.celzero.firestack.intra.Tunnel
 import com.celzero.firestack.settings.Settings
+import dev.warden.rules.AppRules
 import dev.warden.rules.Blocklists
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -44,6 +45,8 @@ class WardenVpnService : VpnService(), Bridge {
     @Volatile private var tunnel: Tunnel? = null
 
     @Volatile private var dnsTransport = Backend.Default
+
+    @Volatile private var cellular = false // per-app rules differ for Wi-Fi and mobile data
     private val ids = AtomicLong()
     private val cm by lazy { getSystemService(ConnectivityManager::class.java) }
 
@@ -53,11 +56,18 @@ class WardenVpnService : VpnService(), Bridge {
             if (cm.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) return
             useSystemDns(lp)
         }
+
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                cellular = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+            }
+        }
     }
 
     override fun onCreate() {
         super.onCreate()
         Blocklists.init(this) // always-on VPN can start us before any activity
+        AppRules.init(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -84,6 +94,7 @@ class WardenVpnService : VpnService(), Bridge {
         val lp = cm.getLinkProperties(cm.activeNetwork)
         // Only claim IPv6 when the real network has it; then route all global unicast v6 so none leaks.
         // ponytail: decided once at start; re-establish on v4<->v6 network changes comes with M2.
+        cellular = cm.getNetworkCapabilities(cm.activeNetwork)?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
         val has6 = lp?.routes.orEmpty().any { it.isDefaultRoute && it.destination.address is Inet6Address }
 
         val builder = Builder()
@@ -219,7 +230,7 @@ class WardenVpnService : VpnService(), Bridge {
         val cid = ids.incrementAndGet().toString()
         val toOurDns = host(dst) == DNS4 || host(dst) == DNS6
         val names = (domains.split(',') + probableDomains.split(',')).map(::normalize).filter { it.isNotEmpty() }
-        val blocked = !toOurDns && names.any(::isBlocked)
+        val blocked = !toOurDns && (AppRules.blocks(uid, cellular) || names.any(::isBlocked))
         if (!toOurDns) {
             Engine.record(
                 NetEvent(cid, System.currentTimeMillis(), uid, protocolName(protocol), names.firstOrNull(), dst, blocked),
@@ -252,7 +263,8 @@ class WardenVpnService : VpnService(), Bridge {
     override fun onQuery(who: String, uid: String, domain: String, qtyp: Long): DNSOpts = DNSOpts().apply {
         this.uid = uid
         ipcsv = ""
-        tidcsv = if (isBlocked(normalize(domain))) Backend.BlockAll else dnsTransport
+        val appBlocked = uid.toIntOrNull()?.let { AppRules.blocks(it, cellular) } == true
+        tidcsv = if (appBlocked || isBlocked(normalize(domain))) Backend.BlockAll else dnsTransport
     }
 
     override fun onResponse(s: DNSSummary?) {
@@ -266,7 +278,7 @@ class WardenVpnService : VpnService(), Bridge {
                 kind = "dns",
                 domain = name,
                 target = s.rData.ifEmpty { "no answer" },
-                blocked = isBlocked(name),
+                blocked = isBlocked(name) || s.uid.toIntOrNull()?.let { AppRules.blocks(it, cellular) } == true,
             ),
         )
     }

@@ -46,6 +46,11 @@ import dev.warden.design.Sparkline
 import dev.warden.design.StatSquare
 import dev.warden.design.Warden
 import dev.warden.design.formatBytes
+import dev.warden.design.Tile
+import dev.warden.design.WardenSwitch
+import dev.warden.rules.AppRule
+import dev.warden.rules.AppRules
+import androidx.compose.runtime.collectAsState
 import dev.warden.design.tabular
 import dev.warden.engine.NetEvent
 import dev.warden.engine.activity
@@ -118,6 +123,7 @@ internal fun AppDetail(
                 }
             }
         }
+        item { AccessCard(uid, name) }
         // Summary first, in plain words.
         item {
             Text(
@@ -267,3 +273,43 @@ private fun DomainRow(d: DomainGroup, most: Int, time: DateFormat) {
 }
 
 private const val MAX_EXPANDED = 10
+
+/** Network access for this app. Switch on = allowed. Applies to new connections. */
+@Composable
+private fun AccessCard(uid: Int, name: String) {
+    val c = Warden.colors
+    val rules by AppRules.rules.collectAsState()
+    val rule = rules[uid] ?: AppRule()
+    Tile(Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.l).fillMaxWidth()) {
+        AccessRow(
+            DesignR.drawable.ph_wifi_high,
+            stringResource(R.string.apps_wifi),
+            allowed = !rule.blockWifi,
+            description = stringResource(R.string.apps_wifi_for, name),
+        ) { AppRules.set(uid, rule.copy(blockWifi = !it)) }
+        HorizontalDivider(color = c.outline)
+        AccessRow(
+            DesignR.drawable.ph_cell_signal_full,
+            stringResource(R.string.apps_cellular),
+            allowed = !rule.blockCellular,
+            description = stringResource(R.string.apps_cellular_for, name),
+        ) { AppRules.set(uid, rule.copy(blockCellular = !it)) }
+    }
+}
+
+@Composable
+private fun AccessRow(icon: Int, label: String, allowed: Boolean, description: String, onChange: (Boolean) -> Unit) {
+    val c = Warden.colors
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(painterResource(icon), null, Modifier.size(20.dp), tint = if (allowed) c.text else c.blocked)
+        Column(Modifier.weight(1f).padding(start = Spacing.m)) {
+            Text(label, style = Warden.type.body)
+            Text(
+                stringResource(if (allowed) R.string.apps_allowed else R.string.apps_blocked_word).uppercase(),
+                style = Warden.type.caption,
+                color = if (allowed) c.muted else c.blocked,
+            )
+        }
+        WardenSwitch(allowed, onChange, contentDescription = description)
+    }
+}

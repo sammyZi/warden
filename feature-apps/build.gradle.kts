@@ -13,5 +13,6 @@ android {
 dependencies {
     implementation(project(":core-design"))
     implementation(project(":core-engine"))
+    implementation(project(":core-rules"))
     implementation(libs.activity.compose)
 }
