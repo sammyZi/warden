@@ -1,0 +1,24 @@
+[versions]
+agp = "9.5.0"
+kotlin = "2.4.21"
+compose-bom = "2026.09.00"
+activity-compose = "1.13.0"
+coroutines = "1.11.0"
+# Pinned commit build from Maven Central; same pin Rethink ships (rethink-app/gradle.properties).
+firestack = "d3d530ea3e"
+
+[libraries]
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+firestack = { module = "com.celzero:firestack", version.ref = "firestack" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+# AGP 9 has built-in Kotlin; declaring KGP here only lifts its version from AGP's 2.2.10 floor.
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
