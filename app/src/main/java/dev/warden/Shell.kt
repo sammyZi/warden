@@ -25,6 +25,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -77,8 +78,9 @@ import androidx.compose.ui.platform.LocalDensity
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.glass.GlassStyle
-import dev.chrisbanes.haze.glass.hazeGlass
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import dev.warden.design.LocalBarInset
@@ -200,14 +202,23 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
 private fun BottomBar(current: Tab, haze: HazeState, modifier: Modifier, onSelect: (Tab) -> Unit) {
     val c = Warden.colors
     val shape = RoundedCornerShape(Radii.large)
-    val style = remember { GlassStyle { shape(shape) } }
+    // Frosted, not clear glass: enough blur and tint that text scrolling behind never fights the labels.
+    val style = remember(c) {
+        HazeBlurStyle {
+            blurRadius(20.dp)
+            backgroundColor(c.background)
+            colorEffects(listOf(HazeColorEffect.tint(c.background.copy(alpha = 0.72f))))
+            noiseFactor(0.04f)
+        }
+    }
     Box(modifier.navigationBarsPadding().padding(horizontal = Spacing.l, vertical = Spacing.s)) {
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
                 .height(68.dp)
                 .clip(shape)
-                .hazeGlass(HazeInput.Backdrop(haze), style, HazePerformanceMode.Balanced)
+                .hazeBlur(HazeInput.Backdrop(haze), style, HazePerformanceMode.Balanced)
+                .border(1.dp, c.outline.copy(alpha = 0.6f), shape)
                 .padding(Spacing.s),
         ) {
             val itemWidth = maxWidth / Tab.entries.size

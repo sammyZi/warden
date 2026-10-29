@@ -51,6 +51,6 @@ dependencies {
     implementation(project(":feature-settings"))
     implementation(libs.activity.compose)
     implementation(libs.haze)
-    implementation(libs.haze.glass)
+    implementation(libs.haze.blur)
     debugImplementation(libs.compose.ui.tooling)
 }

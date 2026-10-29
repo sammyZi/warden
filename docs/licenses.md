@@ -10,7 +10,7 @@ Every dependency, dataset and asset is checked before use. "Checked" = date the 
 | [rethink-app](https://github.com/celzero/rethink-app) | Integration reference for firestack (`GoVpnAdapter`, `BraveVPNService`, `TunFlowManager`, `TunDnsManager`) | Apache-2.0 (LICENSE file confirmed) | No code copied; `WardenVpnService` follows its call patterns and constants (fake LAN ranges) with attribution in the source | Last push 2026-10-26 | 2026-10-29 |
 | [Phosphor Icons](https://github.com/phosphor-icons/core) | Icons (vector drawables converted from SVG) | MIT | Yes (only icons used) | | 2026-10-29 |
 | AndroidX / Jetpack Compose / Material 3 | UI | Apache-2.0 | Yes | Google | 2026-10-29 |
-| [Haze](https://github.com/chrisbanes/haze) (`haze`, `haze-glass` 2.0.1) | Liquid-glass tab bar (backdrop blur/refraction) | Apache-2.0 | Yes | Last push 2026-10-29, ~2.6k stars. GPU RenderEffect on API 31+, translucent fallback below. | 2026-10-30 |
+| [Haze](https://github.com/chrisbanes/haze) (`haze`, `haze-blur` 2.0.1) | Frosted tab bar (backdrop blur) | Apache-2.0 | Yes | Last push 2026-10-29, ~2.6k stars. GPU RenderEffect on API 31+, translucent fallback below. | 2026-10-30 |
 | kotlinx.coroutines | Flows, concurrency | Apache-2.0 | Yes | JetBrains | 2026-10-29 |
 | [Rubik](https://github.com/googlefonts/rubik) | The only UI font (variable TTF in `res/font`) | SIL OFL 1.1 | Yes (+ OFL text in assets) | | 2026-10-29 |
 | DB-IP IP to Country Lite | Offline IP-to-country (`assets/geo`) | CC BY 4.0 | Yes, credited in Settings → About | Monthly releases | 2026-10-29 |
