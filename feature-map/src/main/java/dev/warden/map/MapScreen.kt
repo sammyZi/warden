@@ -59,6 +59,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import kotlin.math.roundToInt
+import dev.warden.design.Tile
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.warden.design.IconBadge
 import dev.warden.design.Motion
@@ -165,9 +169,10 @@ private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -
             if (d == null) {
                 Text(
                     stringResource(if (destinations.isEmpty()) R.string.map_empty else R.string.map_hint),
-                    Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.l),
-                    style = Warden.type.body,
+                    Modifier.fillMaxWidth().padding(horizontal = Spacing.xl, vertical = Spacing.s),
+                    style = Warden.type.label,
                     color = c.muted,
+                    textAlign = TextAlign.Center,
                 )
             } else {
                 // Tapped on the globe: a one-line summary that opens the full traffic view.
@@ -190,7 +195,12 @@ private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -
             }
         }
         if (destinations.isNotEmpty()) {
-            item { SectionLabel(stringResource(R.string.map_countries), Modifier.padding(horizontal = Spacing.xl)) }
+            item {
+                Row(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.l, bottom = Spacing.s)) {
+                    SectionLabel(stringResource(R.string.map_countries), Modifier.weight(1f))
+                    SectionLabel(destinations.size.toString())
+                }
+            }
         }
         items(destinations, key = { it.country.iso }) { d ->
             CountryRow(d, total) {
@@ -203,30 +213,34 @@ private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -
     }
 }
 
+/** A country as a card: code badge in its hue, name and counts, share of all traffic, share bar. */
 @Composable
 private fun CountryRow(d: Destination, total: Int, onClick: () -> Unit) {
     val c = Warden.colors
     val hue = countryHue(d.country.iso, c.palette)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .heightIn(min = 64.dp)
-            .padding(horizontal = Spacing.xl, vertical = Spacing.m),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s),
-    ) {
+    Tile(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.xs).fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-            Swatch(hue)
-            Text(countryName(d.country.iso), Modifier.weight(1f), style = Warden.type.body)
-            if (d.blocked > 0) BlockedTag(d.blocked)
-            Text(d.connections.toString(), style = Warden.type.caption.tabular(), color = c.muted)
-            Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(16.dp), tint = c.muted)
+            Box(Modifier.size(40.dp).background(hue.copy(alpha = 0.18f), CircleShape), contentAlignment = Alignment.Center) {
+                Text(d.country.iso, style = Warden.type.label.copy(fontWeight = FontWeight.SemiBold), color = hue)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(countryName(d.country.iso), style = Warden.type.body.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+                Text(
+                    pluralStringResource(R.plurals.map_connections, d.connections, d.connections) + " · " +
+                        pluralStringResource(R.plurals.map_n_apps, d.apps, d.apps),
+                    style = Warden.type.label.tabular(),
+                    color = c.muted,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${(d.connections * 100f / total).roundToInt()}%", style = Warden.type.title.tabular())
+                if (d.blocked > 0) BlockedTag(d.blocked)
+            }
         }
-        Box(Modifier.fillMaxWidth().height(3.dp).background(c.surfaceVariant, RoundedCornerShape(2.dp))) {
+        Box(Modifier.fillMaxWidth().height(4.dp).background(c.surfaceVariant, RoundedCornerShape(2.dp))) {
             Box(Modifier.fillMaxWidth(d.connections / total.toFloat()).fillMaxHeight().background(hue, RoundedCornerShape(2.dp)))
         }
     }
-    HorizontalDivider(Modifier.padding(horizontal = Spacing.xl), color = c.outline)
 }
 
 /** Everything that went to one country: totals, the apps that went there, every connection. */
