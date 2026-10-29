@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -45,7 +46,11 @@ class WardenVpnService : VpnService(), Bridge {
     private val cm by lazy { getSystemService(ConnectivityManager::class.java) }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) = useSystemDns(lp)
+        override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) {
+            // Some devices report our own tunnel here; its DNS is us, so taking it would loop.
+            if (cm.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) return
+            useSystemDns(lp)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -54,6 +59,9 @@ class WardenVpnService : VpnService(), Bridge {
             return START_NOT_STICKY
         }
         if (tunnel == null) {
+            // Foreground first: if connect() fails we can still stop cleanly instead of
+            // tripping ForegroundServiceDidNotStartInTimeException.
+            goForeground()
             try {
                 connect()
             } catch (e: Exception) {
@@ -101,20 +109,23 @@ class WardenVpnService : VpnService(), Bridge {
         }
         useSystemDns(lp)
         cm.registerDefaultNetworkCallback(networkCallback)
+        Engine.setRunning(true)
+    }
 
+    private fun goForeground() {
         val n = notification()
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED)
         } else {
             startForeground(NOTIFICATION_ID, n)
         }
-        Engine.setRunning(true)
     }
 
     /** Forward allowed queries to the underlying network's resolvers, like the phone would without us. */
     private fun useSystemDns(lp: LinkProperties?) {
         val t = tunnel ?: return
         val csv = lp?.dnsServers.orEmpty().mapNotNull { it.hostAddress }.joinToString(",")
+        Log.i(TAG, "upstream dns: ${csv.ifEmpty { "none, using builtin default" }}")
         dnsTransport = if (csv.isNotEmpty() && runCatching { Intra.setSystemDNS(t, csv) }.isSuccess) {
             Backend.System
         } else {
