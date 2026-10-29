@@ -78,7 +78,7 @@ fun DashboardScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.xl),
     ) {
-        Spacer(Modifier.height(Spacing.xl))
+        Spacer(Modifier.height(Spacing.s))
         Text(
             stringResource(if (state == PowerState.On) R.string.dashboard_on_detail else R.string.dashboard_off_detail),
             style = Warden.type.body,

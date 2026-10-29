@@ -88,7 +88,7 @@ fun LogScreen(
 
     LazyColumn(modifier.fillMaxSize()) {
         item {
-            Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.xl)) {
+            Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.s)) {
                 Text(stringResource(R.string.log_title), style = Warden.type.headline)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                     LiveDot(running)

@@ -117,7 +117,7 @@ private fun SettingsHome(
     ) {
         Text(
             stringResource(R.string.settings_title_sans),
-            Modifier.padding(top = Spacing.xl, bottom = Spacing.m),
+            Modifier.padding(top = Spacing.s, bottom = Spacing.m),
             style = Warden.type.headline,
         )
 
@@ -162,10 +162,9 @@ private fun SettingsHome(
             }
         }
 
-        Section(stringResource(R.string.settings_blocklists)) {
-            Text(stringResource(R.string.settings_blocklists_note), style = Warden.type.label, color = c.muted)
-            Blocklists.catalog.forEach { source ->
-                HorizontalDivider(color = c.outline)
+        Section(stringResource(R.string.settings_blocklists), note = stringResource(R.string.settings_blocklists_note)) {
+            Blocklists.catalog.forEachIndexed { i, source ->
+                if (i > 0) HorizontalDivider(color = c.outline)
                 BlocklistRow(source, lists.getValue(source.id))
             }
         }
@@ -201,8 +200,10 @@ private fun SettingsHome(
 }
 
 @Composable
-private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun Section(title: String, note: String? = null, content: @Composable ColumnScope.() -> Unit) {
     SectionLabel(title, Modifier.padding(top = Spacing.l))
+    // One short line of context sits outside the card, so the card holds only controls.
+    if (note != null) Text(note, style = Warden.type.label, color = Warden.colors.muted)
     Tile(Modifier.fillMaxWidth(), content = content)
 }
 
@@ -256,15 +257,20 @@ private fun BlocklistRow(source: BlocklistSource, state: BlocklistState) {
                 state.enabled && state.entries > 0 -> stringResource(
                     R.string.settings_bl_entries,
                     NumberFormat.getIntegerInstance().format(state.entries),
-                    DateUtils.getRelativeTimeSpanString(state.updatedAt).toString(),
+                    DateUtils.getRelativeTimeSpanString(
+                        state.updatedAt,
+                        System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS,
+                        DateUtils.FORMAT_ABBREV_RELATIVE,
+                    ).toString(),
                 )
                 else -> stringResource(R.string.settings_bl_license, source.license)
             }
             val canTap = !state.busy && (state.failed || state.enabled)
             Text(
-                status.uppercase(),
+                status,
                 if (canTap) Modifier.clickable { Blocklists.refresh(source.id) }.padding(vertical = Spacing.xs) else Modifier,
-                style = Warden.type.caption,
+                style = Warden.type.label,
                 color = if (state.failed) c.blocked else c.muted,
             )
         }

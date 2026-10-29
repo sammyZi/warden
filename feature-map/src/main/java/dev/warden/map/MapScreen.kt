@@ -19,6 +19,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import dev.warden.design.Radii
+import dev.warden.design.WardenButton
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
@@ -88,13 +89,14 @@ fun MapScreen(
     val g = geo ?: return Box(modifier.fillMaxSize()) // ~150ms load, not worth a spinner
 
     // Optional app filter: the globe, arcs and country list then show only that app's traffic.
-    var appFilter by rememberSaveable { mutableStateOf<Int?>(null) }
+    // Empty = every app. ponytail: plain remember, so a rotation resets the selection.
+    var appFilter by remember { mutableStateOf(emptySet<Int>()) }
     val topApps = remember(events) {
         events.filter { it.kind != "dns" }.groupingBy { it.uid }.eachCount()
             .entries.sortedByDescending { it.value }.map { it.key to it.value }
     }
     val destinations = remember(events, g, appFilter) {
-        aggregate(if (appFilter == null) events else events.filter { it.uid == appFilter }, g)
+        aggregate(if (appFilter.isEmpty()) events else events.filter { it.uid in appFilter }, g)
     }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = detail != null) { detail = null }
@@ -141,7 +143,7 @@ private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -
 
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.xl)) {
+            Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.s)) {
                 Text(stringResource(R.string.map_title_sans), style = Warden.type.headline)
             }
         }
@@ -386,43 +388,53 @@ private const val DEFAULT_LAT = 20f
 
 /**
  * One pill showing the current choice; tapping opens a searchable sheet of every app that connected,
- * busiest first. Scales to any number of apps, unlike a sideways chip row.
+ * busiest first, where any number of apps can be picked. Empty selection = all apps.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppFilter(
     apps: List<Pair<Int, Int>>,
-    selected: Int?,
-    onSelect: (Int?) -> Unit,
+    selected: Set<Int>,
+    onSelect: (Set<Int>) -> Unit,
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
 ) {
     if (apps.isEmpty()) return
     val c = Warden.colors
     var open by rememberSaveable { mutableStateOf(false) }
+    val any = selected.isNotEmpty()
     Box(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.s).heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
         Row(
             Modifier
                 .clip(RoundedCornerShape(50))
-                .background(if (selected != null) c.primary else c.surface)
-                .border(1.dp, if (selected != null) c.primary else c.outline, RoundedCornerShape(50))
+                .background(if (any) c.primary else c.surface)
+                .border(1.dp, if (any) c.primary else c.outline, RoundedCornerShape(50))
                 .clickable(role = Role.Button) { open = true }
-                .padding(start = if (selected != null) Spacing.s else Spacing.l, end = Spacing.m, top = 8.dp, bottom = 8.dp),
+                .padding(start = if (any) Spacing.s else Spacing.l, end = Spacing.m, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s),
         ) {
-            val ink = if (selected != null) c.onPrimary else c.text
-            selected?.let { uid -> appIcon(uid)?.let { Image(it, null, Modifier.size(24.dp).clip(CircleShape)) } }
-            Text(selected?.let(appLabel) ?: stringResource(R.string.map_all_apps), style = Warden.type.body, color = ink, maxLines = 1)
+            val ink = if (any) c.onPrimary else c.text
+            // Up to three overlapping icons for the picked apps.
+            Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
+                selected.take(3).forEach { uid -> appIcon(uid)?.let { Image(it, null, Modifier.size(24.dp).clip(CircleShape)) } }
+            }
+            Text(
+                when (selected.size) {
+                    0 -> stringResource(R.string.map_all_apps)
+                    1 -> appLabel(selected.first())
+                    else -> pluralStringResource(R.plurals.map_n_apps, selected.size, selected.size)
+                },
+                style = Warden.type.body,
+                color = ink,
+                maxLines = 1,
+            )
             Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(14.dp).graphicsLayer { rotationZ = 90f }, tint = ink)
         }
     }
     if (open) {
         ModalBottomSheet(onDismissRequest = { open = false }, containerColor = c.background) {
-            AppPicker(apps, selected, appLabel, appIcon) {
-                onSelect(it)
-                open = false
-            }
+            AppPicker(apps, selected, onSelect, appLabel, appIcon, onDone = { open = false })
         }
     }
 }
@@ -430,10 +442,11 @@ private fun AppFilter(
 @Composable
 private fun AppPicker(
     apps: List<Pair<Int, Int>>,
-    selected: Int?,
+    selected: Set<Int>,
+    onSelect: (Set<Int>) -> Unit,
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
-    onPick: (Int?) -> Unit,
+    onDone: () -> Unit,
 ) {
     val c = Warden.colors
     var query by rememberSaveable { mutableStateOf("") }
@@ -462,12 +475,25 @@ private fun AppPicker(
                 }
             },
         )
-        LazyColumn(Modifier.padding(top = Spacing.s)) {
-            if (query.isBlank()) item { PickerRow(stringResource(R.string.map_all_apps), null, null, selected == null) { onPick(null) } }
+        LazyColumn(Modifier.weight(1f).padding(top = Spacing.s)) {
+            if (query.isBlank()) {
+                item { PickerRow(stringResource(R.string.map_all_apps), null, null, selected.isEmpty()) { onSelect(emptySet()) } }
+            }
             items(shown, key = { it.first }) { (uid, count) ->
-                PickerRow(appLabel(uid), appIcon(uid), count, selected == uid) { onPick(uid) }
+                PickerRow(appLabel(uid), appIcon(uid), count, uid in selected) {
+                    onSelect(if (uid in selected) selected - uid else selected + uid)
+                }
             }
         }
+        WardenButton(
+            if (selected.isEmpty()) {
+                stringResource(R.string.map_done)
+            } else {
+                pluralStringResource(R.plurals.map_show_n, selected.size, selected.size)
+            },
+            onDone,
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.xl, vertical = Spacing.m),
+        )
     }
 }
 

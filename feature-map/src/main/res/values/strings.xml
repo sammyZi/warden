@@ -8,6 +8,15 @@
     </plurals>
     <string name="map_all_apps">All apps</string>
     <string name="map_search_apps">Search apps</string>
+    <string name="map_done">Done</string>
+    <plurals name="map_n_apps">
+        <item quantity="one">%d app</item>
+        <item quantity="other">%d apps</item>
+    </plurals>
+    <plurals name="map_show_n">
+        <item quantity="one">Show %d app</item>
+        <item quantity="other">Show %d apps</item>
+    </plurals>
     <string name="map_see_all">See all</string>
     <string name="map_countries">Countries</string>
     <string name="map_back">Back to the globe</string>

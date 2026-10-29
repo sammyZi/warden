@@ -167,7 +167,7 @@ private fun AppList(
     LazyColumn(
         Modifier.fillMaxSize(),
         state = listState,
-        contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.l),
+        contentPadding = PaddingValues(start = Spacing.l, end = Spacing.l, top = Spacing.s, bottom = Spacing.l),
         verticalArrangement = Arrangement.spacedBy(Spacing.s),
     ) {
         item {
