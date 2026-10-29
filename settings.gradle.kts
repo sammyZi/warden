@@ -20,6 +20,7 @@ include(
     ":app",
     ":core-engine",
     ":core-rules",
+    ":core-data",
     ":core-design",
     ":feature-dashboard",
     ":feature-apps",

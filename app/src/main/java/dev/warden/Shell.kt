@@ -91,6 +91,7 @@ import dev.warden.design.Spacing
 import dev.warden.design.Warden
 import dev.warden.design.ThemeMode
 import dev.warden.design.glow
+import dev.warden.data.History
 import dev.warden.engine.Engine
 import dev.warden.rules.Blocklists
 import dev.warden.engine.WardenVpnService
@@ -120,7 +121,8 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
     BackHandler(enabled = tab != Tab.Home) { tab = Tab.Home }
 
     val running by Engine.running.collectAsState()
-    val events by Engine.events.collectAsState()
+    // Saved history, so lists survive restarts; the engine feeds it in 1.5s batches.
+    val events by remember { History.recent() }.collectAsState(emptyList())
     val lists by Blocklists.states.collectAsState()
     val (power, onPower) = rememberPower(running)
     val apps = remember { AppInfo(context.packageManager, context) }
@@ -153,7 +155,6 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
                 when (t) {
                     Tab.Home -> DashboardScreen(
                         state = power,
-                        events = events,
                         appLabel = apps::label,
                         appIcon = apps::icon,
                         onPowerClick = onPower,

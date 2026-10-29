@@ -22,7 +22,14 @@ data class NetEvent(
     val blocked: Boolean,
     val bytesUp: Long = 0,
     val bytesDown: Long = 0,
+    /** DNS answer time, or the connection's round-trip time once it closes. */
+    val latencyMs: Int? = null,
+    /** DNS lookup with no answer, or a connection that closed with an error. */
+    val failed: Boolean = false,
 )
+
+/** A connection's final numbers, reported when it closes. */
+data class Closed(val id: String, val up: Long, val down: Long, val rttMs: Int?, val failed: Boolean)
 
 /** Event counts per [bucketMs] slice over the last [buckets] slices, oldest first. */
 fun List<NetEvent>.activity(buckets: Int = 20, bucketMs: Long = 15_000L, now: Long = System.currentTimeMillis()): List<Int> {
@@ -59,22 +66,35 @@ object Engine {
         }
     }
 
+    // Persistence queues, drained in batches by the history writer (bounded if nobody drains).
+    private val pendingNew = ArrayList<NetEvent>()
+    private val pendingClosed = ArrayList<Closed>()
+
+    /** Events recorded since the last call, oldest first. */
+    fun drainNew(): List<NetEvent> = synchronized(pendingNew) { pendingNew.toList().also { pendingNew.clear() } }
+
+    /** Connection closes since the last call. */
+    fun drainClosed(): List<Closed> = synchronized(pendingClosed) { pendingClosed.toList().also { pendingClosed.clear() } }
+
     internal fun record(e: NetEvent) {
         synchronized(buffer) {
             buffer.addFirst(e)
             if (buffer.size > MAX_EVENTS) buffer.removeLast()
         }
+        synchronized(pendingNew) { if (pendingNew.size < MAX_PENDING) pendingNew.add(e) }
         kick.trySend(Unit)
     }
 
-    internal fun closed(id: String, up: Long, down: Long) {
+    internal fun closed(c: Closed) {
         synchronized(buffer) {
-            val i = buffer.indexOfFirst { it.id == id }
-            if (i >= 0) buffer[i] = buffer[i].copy(bytesUp = up, bytesDown = down)
+            val i = buffer.indexOfFirst { it.id == c.id }
+            if (i >= 0) buffer[i] = buffer[i].copy(bytesUp = c.up, bytesDown = c.down, latencyMs = c.rttMs, failed = c.failed)
         }
+        synchronized(pendingClosed) { if (pendingClosed.size < MAX_PENDING) pendingClosed.add(c) }
         kick.trySend(Unit)
     }
 
     private const val MAX_EVENTS = 300
+    private const val MAX_PENDING = 20_000
     private const val PUBLISH_MS = 500L
 }

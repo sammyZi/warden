@@ -43,6 +43,7 @@ android {
 dependencies {
     implementation(project(":core-engine"))
     implementation(project(":core-rules"))
+    implementation(project(":core-data"))
     implementation(project(":core-design"))
     implementation(project(":feature-dashboard"))
     implementation(project(":feature-apps"))

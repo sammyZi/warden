@@ -9,6 +9,9 @@ coroutines = "1.11.0"
 # Pinned commit build from Maven Central; same pin Rethink ships (rethink-app/gradle.properties).
 firestack = "d3d530ea3e"
 junit = "4.13.2"
+room = "2.8.5"
+# KSP2, decoupled from the Kotlin version; needed for Room's compiler.
+ksp = "2.3.12"
 # Frosted backdrop blur for the tab bar (Apache-2.0); RenderEffect on API 31+, tinted fallback below.
 haze = "2.0.1"
 # detekt 2.x is still alpha (Oct 2026); 1.23.8 runs with its own embedded Kotlin.
@@ -23,6 +26,9 @@ activity-compose = { module = "androidx.activity:activity-compose", version.ref 
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 firestack = { module = "com.celzero:firestack", version.ref = "firestack" }
 junit = { module = "junit:junit", version.ref = "junit" }
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 detekt-formatting = { module = "io.gitlab.arturbosch.detekt:detekt-formatting", version.ref = "detekt" }
@@ -34,3 +40,4 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

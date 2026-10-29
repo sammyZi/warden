@@ -312,7 +312,9 @@ class WardenVpnService : VpnService(), Bridge {
     override fun flowing(m: Mark?) = Unit
 
     override fun postflow(s: FlowSummary?) {
-        if (s != null) Engine.closed(s.id, up = s.tx, down = s.rx)
+        if (s == null) return
+        // rtt is in ms; a non-empty msg means the connection ended with an error.
+        Engine.closed(Closed(s.id, up = s.tx, down = s.rx, rttMs = s.rtt.toInt().takeIf { it > 0 }, failed = s.msg.isNotBlank()))
     }
 
     override fun onQuery(who: String, uid: String, domain: String, qtyp: Long): DNSOpts = DNSOpts().apply {
@@ -333,6 +335,8 @@ class WardenVpnService : VpnService(), Bridge {
                 domain = name,
                 target = s.rData.ifEmpty { "no answer" },
                 blocked = Rules.blocks(s.uid.toIntOrNull() ?: UNKNOWN_UID, listOf(name), cellular),
+                latencyMs = (s.latency * MS_PER_S).toInt().takeIf { it > 0 },
+                failed = s.rData.isEmpty(),
             ),
         )
     }
@@ -367,6 +371,7 @@ class WardenVpnService : VpnService(), Bridge {
         private const val CHANNEL = "status"
         private const val NOTIFICATION_ID = 1
         private const val MTU = 1500
+        private const val MS_PER_S = 1000
         private const val UNKNOWN_UID = -1
 
         // Private ranges, same shape as Rethink's defaults: .1 is us, .3 is the fake DNS server.

@@ -48,19 +48,24 @@ import dev.warden.design.Radii
 import dev.warden.design.SectionLabel
 import dev.warden.design.BarSpacer
 import dev.warden.design.Spacing
+import dev.warden.design.SegmentedControl
+import dev.warden.data.History
+import dev.warden.data.Range
+import dev.warden.data.RangeStats
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import dev.warden.design.Sparkline
 import dev.warden.design.StatSquare
 import dev.warden.design.Tile
 import dev.warden.design.Warden
 import dev.warden.design.tabular
-import dev.warden.engine.NetEvent
-import dev.warden.engine.activity
 import dev.warden.design.R as DesignR
 
 @Composable
 fun DashboardScreen(
     state: PowerState,
-    events: List<NetEvent>,
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
     onPowerClick: () -> Unit,
@@ -71,7 +76,11 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
 ) {
     val c = Warden.colors
-    val stats = remember(events) { Stats(events) }
+    // Everything below the protection pill comes from saved history, for the chosen range.
+    var range by rememberSaveable { mutableStateOf(Range.Today) }
+    val stats by remember(range) { History.stats(range) }.collectAsState(RangeStats(0, 0, 0, 0, 0))
+    val activity by remember(range) { History.activity(range) }.collectAsState(emptyList())
+    val top by remember(range) { History.apps(range, limit = TOP_APPS) }.collectAsState(emptyList())
 
     Column(
         modifier
@@ -105,6 +114,16 @@ fun DashboardScreen(
         }
 
         Spacer(Modifier.height(Spacing.xl))
+        SegmentedControl(
+            listOf(
+                stringResource(R.string.dashboard_range_today),
+                stringResource(R.string.dashboard_range_week),
+                stringResource(R.string.dashboard_range_month),
+            ),
+            range.ordinal,
+            { range = Range.entries[it] },
+        )
+        Spacer(Modifier.height(Spacing.m))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
             val p = c.palette
             StatSquare(
@@ -132,14 +151,28 @@ fun DashboardScreen(
         }
 
         Spacer(Modifier.height(Spacing.xl))
-        SectionLabel(stringResource(R.string.dashboard_activity))
+        SectionLabel(
+            stringResource(R.string.dashboard_activity) + " · " + stringResource(
+                when (range) {
+                    Range.Today -> R.string.dashboard_range_today
+                    Range.Week -> R.string.dashboard_range_week
+                    Range.Month -> R.string.dashboard_range_month
+                },
+            ),
+        )
         Spacer(Modifier.height(Spacing.s))
-        if (stats.activity.any { it > 0 }) {
+        if (activity.any { it > 0 }) {
             Sparkline(
-                stats.activity,
+                activity,
                 c.accentInk,
                 Modifier.fillMaxWidth().height(120.dp),
-                startLabel = stringResource(R.string.dashboard_activity_start),
+                startLabel = stringResource(
+                    when (range) {
+                        Range.Today -> R.string.dashboard_activity_midnight
+                        Range.Week -> R.string.dashboard_activity_week_ago
+                        Range.Month -> R.string.dashboard_activity_month_ago
+                    },
+                ),
                 endLabel = stringResource(R.string.dashboard_activity_end),
             )
         } else {
@@ -150,10 +183,12 @@ fun DashboardScreen(
         SectionLabel(stringResource(R.string.dashboard_chatty))
         Spacer(Modifier.height(Spacing.s))
         Tile(Modifier.fillMaxWidth()) {
-            if (stats.top.isEmpty()) {
+            if (top.isEmpty()) {
                 Text(stringResource(R.string.dashboard_chatty_empty), style = Warden.type.body, color = c.muted)
             }
-            stats.top.forEachIndexed { i, (uid, count) ->
+            top.forEachIndexed { i, app ->
+                val uid = app.uid
+                val count = app.connections
                 if (i > 0) HorizontalDivider(color = c.outline)
                 ListRow({ onOpenApp(uid) }) {
                     val icon = appIcon(uid)
@@ -235,18 +270,6 @@ private fun ListRow(onClick: () -> Unit, content: @Composable androidx.compose.f
         horizontalArrangement = Arrangement.spacedBy(Spacing.m),
         content = content,
     )
-}
-
-/** Everything the dashboard shows, derived once per events update. */
-private class Stats(events: List<NetEvent>) {
-    val blocked = events.count { it.blocked }
-    val connections = events.count { it.kind != "dns" }
-    val apps = events.map { it.uid }.distinct().size
-    val domains = events.mapNotNull { it.domain }.distinct().size
-    val top: List<Pair<Int, Int>> = events.filter { it.kind != "dns" }.groupingBy { it.uid }.eachCount()
-        .entries.sortedByDescending { it.value }.take(TOP_APPS).map { it.key to it.value }
-
-    val activity = events.activity()
 }
 
 private const val TOP_APPS = 4
