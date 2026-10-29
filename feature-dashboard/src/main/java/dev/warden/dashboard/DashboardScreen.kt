@@ -1,6 +1,15 @@
 package dev.warden.dashboard
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.os.Build
@@ -52,8 +61,6 @@ import dev.warden.design.SegmentedControl
 import dev.warden.data.History
 import dev.warden.data.Range
 import dev.warden.data.RangeStats
-import dev.warden.rules.TrackerSummary
-import dev.warden.rules.summarizeTrackers
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -83,148 +90,188 @@ fun DashboardScreen(
     val stats by remember(range) { History.stats(range) }.collectAsState(RangeStats(0, 0, 0, 0, 0))
     val activity by remember(range) { History.activity(range) }.collectAsState(emptyList())
     val top by remember(range) { History.apps(range, limit = TOP_APPS) }.collectAsState(emptyList())
-    val domains by remember(range) { History.domains(range) }.collectAsState(emptyList())
-    val trackers = remember(domains) { summarizeTrackers(domains) }
+    var tool by rememberSaveable { mutableStateOf<Tool?>(null) }
+    val scroll = rememberScrollState()
+    val reduceMotion = Warden.reduceMotion
 
-    Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.xl),
-    ) {
-        // Same header slot as every other tab.
-        Text(stringResource(R.string.dashboard_title), Modifier.padding(top = Spacing.s, bottom = Spacing.s), style = Warden.type.headline)
-        Text(
-            stringResource(if (state == PowerState.On) R.string.dashboard_on_detail else R.string.dashboard_off_detail),
-            style = Warden.type.body,
-            color = c.muted,
-        )
-        Spacer(Modifier.height(Spacing.l))
-        ProtectionPill(state, onPowerClick)
-        PrivateDnsWarning()
-        if (!blocklistsOn) {
-            // Nothing is blocked until a list is on; say so where the zero shows up.
+    AnimatedContent(
+        tool,
+        modifier,
+        transitionSpec = {
+            if (reduceMotion) ContentTransform(EnterTransition.None, ExitTransition.None) else drillDown(targetState != null)
+        },
+        label = "tool",
+    ) { open ->
+        if (open != null) {
+            ToolScreen(open, range, appLabel, appIcon, onOpenApp, onBack = { tool = null })
+            return@AnimatedContent
+        }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(scroll)
+                .padding(horizontal = Spacing.xl),
+        ) {
+            // Same header slot as every other tab.
+            Text(
+                stringResource(R.string.dashboard_title),
+                Modifier.padding(top = Spacing.s, bottom = Spacing.s),
+                style = Warden.type.headline,
+            )
+            Text(
+                stringResource(if (state == PowerState.On) R.string.dashboard_on_detail else R.string.dashboard_off_detail),
+                style = Warden.type.body,
+                color = c.muted,
+            )
+            Spacer(Modifier.height(Spacing.l))
+            ProtectionPill(state, onPowerClick)
+            PrivateDnsWarning()
+            if (!blocklistsOn) {
+                // Nothing is blocked until a list is on; say so where the zero shows up.
+                Spacer(Modifier.height(Spacing.m))
+                Tile(Modifier.fillMaxWidth(), onClick = onOpenSettings) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                        IconBadge(DesignR.drawable.ph_prohibit, c.blocked)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.dashboard_lists_title),
+                                style = Warden.type.body.copy(fontWeight = FontWeight.Medium),
+                            )
+                            Text(stringResource(R.string.dashboard_lists_body), style = Warden.type.label, color = c.muted)
+                        }
+                        Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(18.dp), tint = c.muted)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(Spacing.xl))
+            SegmentedControl(
+                listOf(
+                    stringResource(R.string.dashboard_range_today),
+                    stringResource(R.string.dashboard_range_week),
+                    stringResource(R.string.dashboard_range_month),
+                ),
+                range.ordinal,
+                { range = Range.entries[it] },
+            )
             Spacer(Modifier.height(Spacing.m))
-            Tile(Modifier.fillMaxWidth(), onClick = onOpenSettings) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                val p = c.palette
+                StatSquare(
+                    DesignR.drawable.ph_prohibit,
+                    c.blocked,
+                    stats.blocked,
+                    stringResource(R.string.dashboard_sq_blocked),
+                    Modifier.weight(1f),
+                )
+                StatSquare(
+                    DesignR.drawable.ph_pulse,
+                    p[0],
+                    stats.connections,
+                    stringResource(R.string.dashboard_sq_connections),
+                    Modifier.weight(1f),
+                )
+                StatSquare(
+                    DesignR.drawable.ph_squares_four,
+                    p[3],
+                    stats.apps,
+                    stringResource(R.string.dashboard_sq_apps),
+                    Modifier.weight(1f),
+                )
+                StatSquare(
+                    DesignR.drawable.ph_globe_hemisphere_west,
+                    p[4],
+                    stats.domains,
+                    stringResource(R.string.dashboard_sq_domains),
+                    Modifier.weight(1f),
+                )
+            }
+
+            Spacer(Modifier.height(Spacing.xl))
+            SectionLabel(stringResource(R.string.dashboard_tools))
+            Spacer(Modifier.height(Spacing.s))
+            ToolsGrid(range) { tool = it }
+            Spacer(Modifier.height(Spacing.xl))
+            SectionLabel(
+                stringResource(R.string.dashboard_activity) + " · " + stringResource(
+                    when (range) {
+                        Range.Today -> R.string.dashboard_range_today
+                        Range.Week -> R.string.dashboard_range_week
+                        Range.Month -> R.string.dashboard_range_month
+                    },
+                ),
+            )
+            Spacer(Modifier.height(Spacing.s))
+            if (activity.any { it > 0 }) {
+                Sparkline(
+                    activity,
+                    c.accentInk,
+                    Modifier.fillMaxWidth().height(120.dp),
+                    startLabel = stringResource(
+                        when (range) {
+                            Range.Today -> R.string.dashboard_activity_midnight
+                            Range.Week -> R.string.dashboard_activity_week_ago
+                            Range.Month -> R.string.dashboard_activity_month_ago
+                        },
+                    ),
+                    endLabel = stringResource(R.string.dashboard_activity_end),
+                )
+            } else {
+                Text(stringResource(R.string.dashboard_activity_none), style = Warden.type.body, color = c.muted)
+            }
+
+            Spacer(Modifier.height(Spacing.xl))
+            SectionLabel(stringResource(R.string.dashboard_chatty))
+            Spacer(Modifier.height(Spacing.s))
+            Tile(Modifier.fillMaxWidth()) {
+                if (top.isEmpty()) {
+                    Text(stringResource(R.string.dashboard_chatty_empty), style = Warden.type.body, color = c.muted)
+                }
+                top.forEachIndexed { i, app ->
+                    val uid = app.uid
+                    val count = app.connections
+                    if (i > 0) HorizontalDivider(color = c.outline)
+                    ListRow({ onOpenApp(uid) }) {
+                        val icon = appIcon(uid)
+                        if (icon != null) {
+                            Image(icon, null, Modifier.size(32.dp))
+                        } else {
+                            IconBadge(DesignR.drawable.ph_squares_four, c.palette[i])
+                        }
+                        Text(appLabel(uid), Modifier.weight(1f), style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(count.toString(), style = Warden.type.caption.tabular(), color = c.muted)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(Spacing.m))
+            Tile(Modifier.fillMaxWidth(), onClick = onOpenMap) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                    IconBadge(DesignR.drawable.ph_prohibit, c.blocked)
+                    IconBadge(DesignR.drawable.ph_globe_hemisphere_west, c.palette[4])
                     Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.dashboard_lists_title), style = Warden.type.body.copy(fontWeight = FontWeight.Medium))
-                        Text(stringResource(R.string.dashboard_lists_body), style = Warden.type.label, color = c.muted)
+                        Text(
+                            stringResource(R.string.dashboard_map_title),
+                            style = Warden.type.body.copy(fontWeight = FontWeight.Medium),
+                        )
+                        Text(
+                            pluralStringResource(R.plurals.dashboard_map_body, stats.domains, stats.domains),
+                            style = Warden.type.label.tabular(),
+                            color = c.muted,
+                        )
                     }
                     Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(18.dp), tint = c.muted)
                 }
             }
+            BarSpacer()
         }
-
-        Spacer(Modifier.height(Spacing.xl))
-        SegmentedControl(
-            listOf(
-                stringResource(R.string.dashboard_range_today),
-                stringResource(R.string.dashboard_range_week),
-                stringResource(R.string.dashboard_range_month),
-            ),
-            range.ordinal,
-            { range = Range.entries[it] },
-        )
-        Spacer(Modifier.height(Spacing.m))
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-            val p = c.palette
-            StatSquare(
-                DesignR.drawable.ph_prohibit,
-                c.blocked,
-                stats.blocked,
-                stringResource(R.string.dashboard_sq_blocked),
-                Modifier.weight(1f),
-            )
-            StatSquare(
-                DesignR.drawable.ph_pulse,
-                p[0],
-                stats.connections,
-                stringResource(R.string.dashboard_sq_connections),
-                Modifier.weight(1f),
-            )
-            StatSquare(DesignR.drawable.ph_squares_four, p[3], stats.apps, stringResource(R.string.dashboard_sq_apps), Modifier.weight(1f))
-            StatSquare(
-                DesignR.drawable.ph_globe_hemisphere_west,
-                p[4],
-                stats.domains,
-                stringResource(R.string.dashboard_sq_domains),
-                Modifier.weight(1f),
-            )
-        }
-
-        Spacer(Modifier.height(Spacing.xl))
-        TrackersCard(trackers, range)
-        Spacer(Modifier.height(Spacing.xl))
-        SectionLabel(
-            stringResource(R.string.dashboard_activity) + " · " + stringResource(
-                when (range) {
-                    Range.Today -> R.string.dashboard_range_today
-                    Range.Week -> R.string.dashboard_range_week
-                    Range.Month -> R.string.dashboard_range_month
-                },
-            ),
-        )
-        Spacer(Modifier.height(Spacing.s))
-        if (activity.any { it > 0 }) {
-            Sparkline(
-                activity,
-                c.accentInk,
-                Modifier.fillMaxWidth().height(120.dp),
-                startLabel = stringResource(
-                    when (range) {
-                        Range.Today -> R.string.dashboard_activity_midnight
-                        Range.Week -> R.string.dashboard_activity_week_ago
-                        Range.Month -> R.string.dashboard_activity_month_ago
-                    },
-                ),
-                endLabel = stringResource(R.string.dashboard_activity_end),
-            )
-        } else {
-            Text(stringResource(R.string.dashboard_activity_none), style = Warden.type.body, color = c.muted)
-        }
-
-        Spacer(Modifier.height(Spacing.xl))
-        SectionLabel(stringResource(R.string.dashboard_chatty))
-        Spacer(Modifier.height(Spacing.s))
-        Tile(Modifier.fillMaxWidth()) {
-            if (top.isEmpty()) {
-                Text(stringResource(R.string.dashboard_chatty_empty), style = Warden.type.body, color = c.muted)
-            }
-            top.forEachIndexed { i, app ->
-                val uid = app.uid
-                val count = app.connections
-                if (i > 0) HorizontalDivider(color = c.outline)
-                ListRow({ onOpenApp(uid) }) {
-                    val icon = appIcon(uid)
-                    if (icon != null) Image(icon, null, Modifier.size(32.dp)) else IconBadge(DesignR.drawable.ph_squares_four, c.palette[i])
-                    Text(appLabel(uid), Modifier.weight(1f), style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(count.toString(), style = Warden.type.caption.tabular(), color = c.muted)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(Spacing.m))
-        Tile(Modifier.fillMaxWidth(), onClick = onOpenMap) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                IconBadge(DesignR.drawable.ph_globe_hemisphere_west, c.palette[4])
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.dashboard_map_title),
-                        style = Warden.type.body.copy(fontWeight = FontWeight.Medium),
-                    )
-                    Text(
-                        pluralStringResource(R.plurals.dashboard_map_body, stats.domains, stats.domains),
-                        style = Warden.type.label.tabular(),
-                        color = c.muted,
-                    )
-                }
-                Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(18.dp), tint = c.muted)
-            }
-        }
-        BarSpacer()
     }
+}
+
+/** Drill-down: the tool screen slides in from the right, Home drifts a little the other way. */
+private fun drillDown(forward: Boolean): ContentTransform {
+    val dir = if (forward) 1 else -1
+    return (slideInHorizontally(Motion.emphasized(Motion.LONG)) { dir * it / 4 } + fadeIn(Motion.emphasized(Motion.LONG)))
+        .togetherWith(slideOutHorizontally(Motion.emphasized(Motion.LONG)) { -dir * it / 4 } + fadeOut(Motion.emphasized(Motion.MEDIUM)))
 }
 
 /** The on/off control: a wide pill, lime when protecting. The power glyph keeps its three states. */
@@ -306,42 +353,3 @@ private fun PrivateDnsWarning() {
         }
     }
 }
-
-/** "Your apps contacted 37 trackers from 12 companies today", then the top companies and what they do. */
-@Composable
-private fun TrackersCard(t: TrackerSummary, range: Range) {
-    val c = Warden.colors
-    SectionLabel(stringResource(R.string.dashboard_trackers))
-    Spacer(Modifier.height(Spacing.s))
-    Tile(Modifier.fillMaxWidth()) {
-        val period = stringResource(
-            when (range) {
-                Range.Today -> R.string.dashboard_period_today
-                Range.Week -> R.string.dashboard_period_week
-                Range.Month -> R.string.dashboard_period_month
-            },
-        )
-        Text(
-            if (t.trackers == 0) {
-                stringResource(R.string.dashboard_trackers_none, period)
-            } else {
-                stringResource(
-                    R.string.dashboard_trackers_sentence,
-                    pluralStringResource(R.plurals.dashboard_n_trackers, t.trackers, t.trackers),
-                    pluralStringResource(R.plurals.dashboard_n_companies, t.companies, t.companies),
-                    period,
-                )
-            },
-            style = Warden.type.title,
-        )
-        t.byCompany.take(TOP_COMPANIES).forEachIndexed { i, (company, categories) ->
-            if (i == 0) HorizontalDivider(color = c.outline)
-            Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(company, Modifier.weight(1f), style = Warden.type.body)
-                Text(categories.joinToString(" · "), style = Warden.type.label, color = c.muted)
-            }
-        }
-    }
-}
-
-private const val TOP_COMPANIES = 5
