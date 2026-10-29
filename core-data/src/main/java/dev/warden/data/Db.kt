@@ -119,6 +119,12 @@ interface ConnectionDao {
 
     @Query("DELETE FROM connections WHERE id IN (SELECT id FROM connections ORDER BY time DESC LIMIT -1 OFFSET :keep)")
     suspend fun keepNewest(keep: Int)
+
+    @Query("DELETE FROM connections")
+    suspend fun clear()
+
+    @Query("SELECT * FROM connections WHERE time >= :since AND kind != 'dns' ORDER BY time DESC LIMIT :limit")
+    fun connectionsSince(since: Long, limit: Int): Flow<List<ConnectionRow>>
 }
 
 @Database(entities = [ConnectionRow::class], version = 1, exportSchema = false)

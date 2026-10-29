@@ -56,6 +56,19 @@ object History {
     /** Most recent events, newest first: what the live screens (apps, map, log) show. */
     fun recent(limit: Int = RECENT_ROWS): Flow<List<NetEvent>> = dao.recent(limit).map { rows -> rows.map { it.toEvent() } }
 
+    /** When this process started: the "this session" range. */
+    val sessionStart = System.currentTimeMillis()
+
+    /** Delete all saved history (and the engine's in-memory list). */
+    fun clear() {
+        Engine.clear()
+        scope.launch { dao.clear() }
+    }
+
+    /** Connections (no DNS answers) since [since], newest first, capped at [limit]. */
+    fun connectionsSince(since: Long, limit: Int = MAP_ROWS): Flow<List<NetEvent>> =
+        dao.connectionsSince(since, limit).map { rows -> rows.map { it.toEvent() } }
+
     fun stats(range: Range): Flow<RangeStats> = dao.stats(start(range))
 
     /** Event counts per bucket across [range], oldest first, zero-filled. */
@@ -107,4 +120,5 @@ object History {
     private const val WEEK_DAYS = 7L
     private const val KEEP_ROWS = 200_000
     private const val RECENT_ROWS = 1_000
+    private const val MAP_ROWS = 5_000
 }

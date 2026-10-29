@@ -76,6 +76,14 @@ object Engine {
     /** Connection closes since the last call. */
     fun drainClosed(): List<Closed> = synchronized(pendingClosed) { pendingClosed.toList().also { pendingClosed.clear() } }
 
+    /** Forget everything in memory (the user cleared history). */
+    fun clear() {
+        synchronized(buffer) { buffer.clear() }
+        synchronized(pendingNew) { pendingNew.clear() }
+        synchronized(pendingClosed) { pendingClosed.clear() }
+        kick.trySend(Unit)
+    }
+
     internal fun record(e: NetEvent) {
         synchronized(buffer) {
             buffer.addFirst(e)

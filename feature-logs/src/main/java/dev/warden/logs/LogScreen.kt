@@ -40,7 +40,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.warden.design.ButtonKind
 import dev.warden.design.EmptyState
+import dev.warden.design.WardenButton
+import androidx.compose.material3.AlertDialog
 import dev.warden.design.FilterChip
 import dev.warden.design.IconBadge
 import dev.warden.design.BarSpacer
@@ -73,6 +76,7 @@ fun LogScreen(
     running: Boolean,
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
+    onClear: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = Warden.colors
@@ -90,8 +94,14 @@ fun LogScreen(
 
     // Title, live line and filters stay put; only the stream below scrolls.
     Column(modifier.fillMaxSize()) {
+        var confirmClear by remember { mutableStateOf(false) }
         Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.s)) {
-            Text(stringResource(R.string.log_title), style = Warden.type.headline)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.log_title), Modifier.weight(1f), style = Warden.type.headline)
+                if (events.isNotEmpty()) {
+                    WardenButton(stringResource(R.string.log_clear), { confirmClear = true }, kind = ButtonKind.Text)
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 LiveDot(running)
                 Text(
@@ -108,6 +118,21 @@ fun LogScreen(
             Filter.entries.forEach { FilterChip(stringResource(it.label), filter == it, { filter = it }) }
         }
         HorizontalDivider(color = c.outline)
+        if (confirmClear) {
+            AlertDialog(
+                onDismissRequest = { confirmClear = false },
+                title = { Text(stringResource(R.string.log_clear_title), style = Warden.type.title) },
+                text = { Text(stringResource(R.string.log_clear_body), style = Warden.type.body) },
+                confirmButton = {
+                    WardenButton(stringResource(R.string.log_clear), {
+                        onClear()
+                        confirmClear = false
+                    }, kind = ButtonKind.Destructive)
+                },
+                dismissButton = { WardenButton(stringResource(R.string.log_cancel), { confirmClear = false }, kind = ButtonKind.Text) },
+                containerColor = c.surface,
+            )
+        }
         LogList(shown, events.isEmpty(), firstAppearance, time, appLabel, appIcon)
     }
 }

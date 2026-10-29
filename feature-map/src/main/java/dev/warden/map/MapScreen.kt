@@ -13,12 +13,19 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import dev.warden.design.Radii
+import dev.warden.design.FilterChip
+import dev.warden.data.History
+import dev.warden.data.Range
+import dev.warden.rules.Trackers
+import androidx.compose.runtime.collectAsState
 import dev.warden.design.WardenButton
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
@@ -83,7 +90,6 @@ import dev.warden.design.R as DesignR
 
 @Composable
 fun MapScreen(
-    events: List<NetEvent>,
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
     onOpenApp: (Int) -> Unit,
@@ -93,15 +99,26 @@ fun MapScreen(
     val geo by produceState<Geo?>(null) { value = withContext(Dispatchers.IO) { loadGeo(context) } }
     val g = geo ?: return Box(modifier.fillMaxSize()) // ~150ms load, not worth a spinner
 
-    // Optional app filter: the globe, arcs and country list then show only that app's traffic.
-    // Empty = every app. ponytail: plain remember, so a rotation resets the selection.
+    // Filters: time span, apps (empty = all), blocked only, trackers only.
+    // ponytail: plain remember, so a rotation resets them.
+    var scope by remember { mutableStateOf(Scope.Session) }
     var appFilter by remember { mutableStateOf(emptySet<Int>()) }
+    var blockedOnly by remember { mutableStateOf(false) }
+    var trackersOnly by remember { mutableStateOf(false) }
+    val events by remember(scope) { History.connectionsSince(scope.since()) }.collectAsState(emptyList())
     val topApps = remember(events) {
-        events.filter { it.kind != "dns" }.groupingBy { it.uid }.eachCount()
-            .entries.sortedByDescending { it.value }.map { it.key to it.value }
+        events.groupingBy { it.uid }.eachCount().entries.sortedByDescending { it.value }.map { it.key to it.value }
     }
-    val destinations = remember(events, g, appFilter) {
-        aggregate(if (appFilter.isEmpty()) events else events.filter { it.uid in appFilter }, g, homeCountry(context)?.let(g::country))
+    // Up to 5,000 rows of geo lookups: grouped off the main thread.
+    val destinations by produceState(emptyList<Destination>(), events, g, appFilter, blockedOnly, trackersOnly) {
+        value = withContext(Dispatchers.Default) {
+            val shown = events.filter { e ->
+                (appFilter.isEmpty() || e.uid in appFilter) &&
+                    (!blockedOnly || e.blocked) &&
+                    (!trackersOnly || Trackers.lookup(e.domain) != null)
+            }
+            aggregate(shown, g, homeCountry(context)?.let(g::country))
+        }
     }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = detail != null) { detail = null }
@@ -128,7 +145,10 @@ fun MapScreen(
         if (iso == null || d == null) {
             Overview(
                 g, destinations, onOpen = { detail = it },
-                filter = { AppFilter(topApps, appFilter, { appFilter = it }, appLabel, appIcon) },
+                filter = {
+                    AppFilter(topApps, appFilter, { appFilter = it }, appLabel, appIcon)
+                    MapFilters(scope, { scope = it }, blockedOnly, { blockedOnly = it }, trackersOnly, { trackersOnly = it })
+                },
             )
         } else {
             CountryDetail(d, appLabel, appIcon, onBack = { detail = null }, onOpenApp = onOpenApp)
@@ -583,3 +603,48 @@ private val SAMPLE = listOf(
     Triple("US", 42, 6), Triple("DE", 18, 0), Triple("SG", 15, 2), Triple("IE", 12, 0),
     Triple("JP", 9, 0), Triple("GB", 7, 0), Triple("NL", 5, 0),
 )
+
+/** How far back the map looks. */
+internal enum class Scope { Session, Today, Week, Month }
+
+private fun Scope.since(): Long = when (this) {
+    Scope.Session -> History.sessionStart
+    Scope.Today -> History.start(Range.Today)
+    Scope.Week -> History.start(Range.Week)
+    Scope.Month -> History.start(Range.Month)
+}
+
+/** Time span chips, then two toggles. One sideways-scrolling row. */
+@Composable
+private fun MapFilters(
+    scope: Scope,
+    onScope: (Scope) -> Unit,
+    blockedOnly: Boolean,
+    onBlockedOnly: (Boolean) -> Unit,
+    trackersOnly: Boolean,
+    onTrackersOnly: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.xl),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Scope.entries.forEach { s ->
+            FilterChip(
+                stringResource(
+                    when (s) {
+                        Scope.Session -> R.string.map_scope_session
+                        Scope.Today -> R.string.map_scope_today
+                        Scope.Week -> R.string.map_scope_week
+                        Scope.Month -> R.string.map_scope_month
+                    },
+                ),
+                s == scope,
+                { onScope(s) },
+            )
+        }
+        Box(Modifier.size(width = 1.dp, height = 24.dp).background(Warden.colors.outline))
+        FilterChip(stringResource(R.string.map_blocked_only), blockedOnly, { onBlockedOnly(!blockedOnly) })
+        FilterChip(stringResource(R.string.map_trackers_only), trackersOnly, { onTrackersOnly(!trackersOnly) })
+    }
+}

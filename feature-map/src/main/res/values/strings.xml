@@ -39,4 +39,10 @@
         <item quantity="one">%d blocked</item>
         <item quantity="other">%d blocked</item>
     </plurals>
+    <string name="map_scope_session">This session</string>
+    <string name="map_scope_today">Today</string>
+    <string name="map_scope_week">7 days</string>
+    <string name="map_scope_month">30 days</string>
+    <string name="map_blocked_only">Blocked</string>
+    <string name="map_trackers_only">Trackers</string>
 </resources>
