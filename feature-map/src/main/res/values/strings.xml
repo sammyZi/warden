@@ -7,6 +7,7 @@
         <item quantity="other">Globe with connections to %d countries. The list below has the same details.</item>
     </plurals>
     <string name="map_all_apps">All apps</string>
+    <string name="map_search_apps">Search apps</string>
     <string name="map_see_all">See all</string>
     <string name="map_countries">Countries</string>
     <string name="map_back">Back to the globe</string>

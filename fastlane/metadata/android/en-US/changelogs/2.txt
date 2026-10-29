@@ -1,0 +1,1 @@
+First public build: live log, per-app detail and rules, blocklists, globe, Private DNS warning.

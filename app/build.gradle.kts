@@ -15,13 +15,25 @@ android {
         versionName = "0.1.0-m1"
     }
 
+    // Real release signing comes from the environment (CI secrets); locally it falls back to the debug key.
+    val keystore = providers.environmentVariable("WARDEN_KEYSTORE").orNull
+    signingConfigs {
+        create("release") {
+            if (keystore != null) {
+                storeFile = file(keystore)
+                storePassword = providers.environmentVariable("WARDEN_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("WARDEN_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("WARDEN_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            // ponytail: debug key so optimized builds can be side-loaded for perf testing; real signing in M8.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (keystore != null) "release" else "debug")
         }
     }
 

@@ -159,6 +159,8 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
                     themeMode = themeMode,
                     onThemeMode = onThemeMode,
                     onReplayIntro = onReplayIntro,
+                    appLabel = apps::label,
+                    appIcon = apps::icon,
                 )
             }
         }

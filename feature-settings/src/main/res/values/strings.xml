@@ -1,19 +1,47 @@
 <resources>
     <string name="settings_title_sans">Settings</string>
-    <string name="settings_appearance">Appearance</string>
-    <string name="settings_theme_system">System</string>
-    <string name="settings_theme_light">Light</string>
-    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_back">Back to settings</string>
+
+    <string name="settings_rules">Your rules</string>
+    <string name="settings_rules_body">Everything you\'ve blocked, allowed or skipped</string>
+    <string name="settings_rules_hint">Tap Remove to undo a rule. It applies right away.</string>
+    <string name="settings_sq_apps">Apps</string>
+    <string name="settings_sq_domains">Domains</string>
+    <string name="settings_sq_skipped">Skipped</string>
+    <string name="settings_sq_lists">Lists</string>
+    <string name="settings_rules_apps">Blocked apps</string>
+    <string name="settings_rules_skipped">Skipped by Warden</string>
+    <string name="settings_rules_domains">Domain rules</string>
+    <string name="settings_blocked_both">On Wi-Fi and mobile data</string>
+    <string name="settings_blocked_wifi">On Wi-Fi</string>
+    <string name="settings_blocked_cellular">On mobile data</string>
+    <string name="settings_skipped_caption">Bypasses the VPN, not filtered or logged</string>
+    <string name="settings_everywhere">Every app</string>
+    <string name="settings_tag_blocked">Blocked</string>
+    <string name="settings_tag_allowed">Allowed</string>
+    <string name="settings_tag_skipped">Skipped</string>
+    <string name="settings_remove">Remove</string>
+    <string name="settings_rules_empty_title">No rules yet</string>
+    <string name="settings_rules_empty_body">Block an app or a domain from its detail screen or the live log, and it shows up here.</string>
+
     <string name="settings_blocklists">Blocklists</string>
     <string name="settings_blocklists_note">Warden blocks the domains on the lists you switch on. Each list downloads from its publisher and refreshes weekly on Wi-Fi. Tap a list\'s status to update it now.</string>
     <string name="settings_bl_downloading">Downloading…</string>
     <string name="settings_bl_failed">Couldn\'t download · tap to retry</string>
     <string name="settings_bl_entries">%1$s domains · updated %2$s</string>
     <string name="settings_bl_license">Off · %1$s</string>
+
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+
     <string name="settings_general">General</string>
     <string name="settings_replay_intro">Show the intro again</string>
+
     <string name="settings_about">About</string>
     <string name="settings_promise">No account, no analytics, no cloud. Warden watches where your apps connect, on this phone, and never decrypts what they send.</string>
+    <string name="settings_credits_title">Open-source credits</string>
     <string name="settings_credits">Engine: firestack (MPL-2.0). IP geolocation by DB-IP.com (CC BY 4.0). Map: Natural Earth. Font: Rubik (OFL). Icons: Phosphor (MIT).</string>
     <string name="settings_version">Version %1$s</string>
 </resources>

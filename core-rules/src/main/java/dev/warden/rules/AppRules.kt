@@ -19,6 +19,11 @@ object AppRules {
     private val _rules = MutableStateFlow<Map<Int, AppRule>>(emptyMap())
     val rules: StateFlow<Map<Int, AppRule>> = _rules.asStateFlow()
 
+    private val _excluded = MutableStateFlow<Set<String>>(emptySet())
+
+    /** Packages that skip Warden entirely (not routed through the VPN, so neither filtered nor logged). */
+    val excluded: StateFlow<Set<String>> = _excluded.asStateFlow()
+
     private val started = AtomicBoolean()
     private lateinit var prefs: SharedPreferences
 
@@ -30,6 +35,7 @@ object AppRules {
             val bits = value as? Int ?: return@mapNotNull null
             uid to AppRule(blockWifi = bits and WIFI != 0, blockCellular = bits and CELLULAR != 0)
         }.toMap()
+        _excluded.value = prefs.getStringSet(EXCLUDED, emptySet()).orEmpty()
     }
 
     /** Does [uid] get blocked on the current network? Safe from any thread. */
@@ -42,8 +48,18 @@ object AppRules {
         val bits = (if (rule.blockWifi) WIFI else 0) or (if (rule.blockCellular) CELLULAR else 0)
         prefs.edit().apply { if (bits == 0) remove(uid.toString()) else putInt(uid.toString(), bits) }.apply()
         _rules.update { if (bits == 0) it - uid else it + (uid to rule) }
+        Rules.reset(uid.toString())
     }
 
+    /** Android applies exclusions when the VPN starts, so a change restarts the tunnel. */
+    fun setExcluded(packages: Collection<String>, excluded: Boolean) {
+        val next = if (excluded) _excluded.value + packages else _excluded.value - packages.toSet()
+        prefs.edit().putStringSet(EXCLUDED, next).apply()
+        _excluded.value = next
+        Rules.restart()
+    }
+
+    private const val EXCLUDED = "excluded"
     private const val WIFI = 1
     private const val CELLULAR = 2
 }

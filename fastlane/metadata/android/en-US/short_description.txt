@@ -1,0 +1,1 @@
+See every server your apps talk to and block trackers. No root, no cloud.

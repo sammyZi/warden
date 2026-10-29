@@ -141,6 +141,7 @@ object Blocklists {
             file(id).takeIf { it.exists() }?.useLines { BlocklistParser.parse(it, all) }
         }
         matcher = DomainSet(all)
+        Rules.reset("") // lists affect every app
     }
 
     /** ponytail: weekly refresh checked on start, unmetered networks only; WorkManager scheduling comes later. */

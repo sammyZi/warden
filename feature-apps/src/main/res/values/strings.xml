@@ -45,6 +45,10 @@
     <string name="apps_cellular">Mobile data</string>
     <string name="apps_wifi_for">Wi-Fi access for %1$s</string>
     <string name="apps_cellular_for">Mobile data access for %1$s</string>
+    <string name="apps_skip">Skip Warden</string>
+    <string name="apps_skip_on">Bypasses the VPN · not filtered or logged</string>
+    <string name="apps_skip_off">Filtered by Warden</string>
+    <string name="apps_skip_for">Skip Warden for %1$s</string>
     <string name="apps_allowed">Allowed</string>
     <string name="apps_more">+%1$d more</string>
     <string name="rule_default">Default</string>

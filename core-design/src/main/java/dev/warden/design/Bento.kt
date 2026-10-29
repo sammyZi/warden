@@ -13,6 +13,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -175,5 +186,41 @@ fun Sparkline(values: List<Int>, color: Color, modifier: Modifier = Modifier) {
 fun ChoiceChips(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
         options.forEachIndexed { i, label -> FilterChip(label, i == selected, { onSelect(i) }) }
+    }
+}
+
+/** Segmented control: a lime pill slides between options. For small, exclusive settings. */
+@Composable
+fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val c = Warden.colors
+    BoxWithConstraints(
+        modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(50))
+            .background(c.surfaceVariant)
+            .padding(4.dp),
+    ) {
+        val segment = maxWidth / options.size
+        val x by animateDpAsState(
+            segment * selected,
+            if (Warden.reduceMotion) snap() else spring(dampingRatio = 0.75f, stiffness = 420f),
+            label = "segment",
+        )
+        Box(Modifier.offset(x = x).width(segment).fillMaxHeight().background(c.primary, RoundedCornerShape(50)))
+        Row(Modifier.fillMaxSize().selectableGroup()) {
+            options.forEachIndexed { i, label ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(50))
+                        .selectable(i == selected, role = Role.RadioButton) { onSelect(i) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label, style = Warden.type.label, color = if (i == selected) c.onPrimary else c.text)
+                }
+            }
+        }
     }
 }

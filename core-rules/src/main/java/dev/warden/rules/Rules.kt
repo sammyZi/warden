@@ -2,7 +2,10 @@ package dev.warden.rules
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -21,6 +24,26 @@ enum class DomainChoice { Default, AllowHere, BlockHere, BlockEverywhere }
 object Rules {
     private val _domains = MutableStateFlow<Map<String, Verdict>>(emptyMap())
     val domains: StateFlow<Map<String, Verdict>> = _domains.asStateFlow()
+
+    // Rules only gate new connections; apps like Chrome and WhatsApp keep long-lived ones open.
+    // After a change the VPN closes the affected connections so the new rule bites immediately.
+    private val _resets = MutableSharedFlow<String>(extraBufferCapacity = 16)
+
+    /** Connections to close after a rule change: a CSV of UIDs, or "" for every connection. */
+    val resets: SharedFlow<String> = _resets.asSharedFlow()
+
+    internal fun reset(uids: String) {
+        _resets.tryEmit(uids)
+    }
+
+    private val _restarts = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** The tunnel must be rebuilt (VPN exclusions only apply when it is established). */
+    val restarts: SharedFlow<Unit> = _restarts.asSharedFlow()
+
+    internal fun restart() {
+        _restarts.tryEmit(Unit)
+    }
 
     private val started = AtomicBoolean()
     private lateinit var prefs: SharedPreferences
@@ -60,10 +83,20 @@ object Rules {
             DomainChoice.BlockHere -> mapOf(app to Verdict.Block, global to null)
             DomainChoice.BlockEverywhere -> mapOf(app to null, global to Verdict.Block)
         }
+        val touchedGlobal = choice == DomainChoice.BlockEverywhere || global in _domains.value
         prefs.edit().apply { changes.forEach { (k, v) -> if (v == null) remove(k) else putString(k, v.name) } }.apply()
         _domains.update { current ->
             current.toMutableMap().apply { changes.forEach { (k, v) -> if (v == null) remove(k) else put(k, v) } }
         }
+        // A global rule can touch any app; a per-app one only this app.
+        reset(if (touchedGlobal) "" else uid.toString())
+    }
+
+    /** Delete one stored rule by its key ("<uid>:<domain>" or "*:<domain>"). */
+    fun remove(key: String) {
+        prefs.edit().remove(key).apply()
+        _domains.update { it - key }
+        reset(if (key.startsWith(GLOBAL)) "" else key.substringBefore(':'))
     }
 
     internal fun lookup(rules: Map<String, Verdict>, prefix: String, name: String): Verdict? {

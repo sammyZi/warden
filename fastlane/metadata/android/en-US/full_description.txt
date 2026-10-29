@@ -1,0 +1,15 @@
+Warden is a privacy-first firewall for Android that needs no root.
+
+It uses Android's local VPN slot to see every connection your apps make, explains it in plain words, and lets you block trackers per app. Nothing leaves your phone: there is no account, no analytics and no cloud.
+
+Features:
+* Live log of every DNS lookup and connection, labelled by app
+* Per-app detail: domains reached, expandable connections, activity
+* Block or allow any domain for one app or everywhere
+* Per-app Wi-Fi and mobile data blocking
+* Downloadable blocklists (HaGeZi, StevenBlack, OISD)
+* Live globe showing which countries your apps talk to, filterable by app
+* Warns when strict Private DNS bypasses filtering
+* Light and dark themes
+
+Warden never decrypts HTTPS: it sees where apps connect, not what they send.

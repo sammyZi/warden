@@ -13,6 +13,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Build
+import android.os.Handler
 import android.os.Process
 import android.util.Log
 import com.celzero.firestack.backend.Backend
@@ -28,6 +29,7 @@ import com.celzero.firestack.intra.Mark
 import com.celzero.firestack.intra.PreMark
 import com.celzero.firestack.intra.Tunnel
 import com.celzero.firestack.settings.Settings
+import dev.warden.rules.AppRules
 import dev.warden.rules.Rules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,11 +51,14 @@ class WardenVpnService : VpnService(), Bridge {
 
     @Volatile private var tunnel: Tunnel? = null
     private var counter: Job? = null
+    private var resets: Job? = null
+    private var restarts: Job? = null
 
     @Volatile private var dnsTransport = Backend.Default
 
     @Volatile private var cellular = false // per-app rules differ for Wi-Fi and mobile data
     private val ids = AtomicLong()
+    private val mainHandler by lazy { Handler(mainLooper) }
     private val cm by lazy { getSystemService(ConnectivityManager::class.java) }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -64,8 +69,13 @@ class WardenVpnService : VpnService(), Bridge {
         }
 
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-            if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
-                cellular = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return
+            val nowCellular = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+            if (nowCellular != cellular) {
+                cellular = nowCellular
+                // Wi-Fi vs mobile rules flip with the network: re-check apps that have one.
+                val ruled = AppRules.rules.value.keys.joinToString(",")
+                if (ruled.isNotEmpty()) runCatching { tunnel?.closeConns(ruled) }
             }
         }
     }
@@ -109,6 +119,8 @@ class WardenVpnService : VpnService(), Bridge {
             .addRoute("0.0.0.0", 0)
             .addDnsServer(DNS4)
             .addDisallowedApplication(packageName)
+        // Apps the user chose to skip; one that has since been uninstalled is simply ignored.
+        AppRules.excluded.value.forEach { runCatching { builder.addDisallowedApplication(it) } }
         if (has6) {
             builder.addAddress(GATEWAY6, 120)
                 .addRoute("2000::", 3)
@@ -133,6 +145,14 @@ class WardenVpnService : VpnService(), Bridge {
         cm.registerDefaultNetworkCallback(networkCallback)
         Engine.setRunning(true)
         // Keep the notification's blocked count current; events already arrive in 500ms batches.
+        resets = CoroutineScope(Dispatchers.Default).launch {
+            Rules.resets.collect { uids ->
+                runCatching { tunnel?.closeConns(uids) }.onFailure { Log.w(TAG, "closeConns($uids)", it) }
+            }
+        }
+        restarts = CoroutineScope(Dispatchers.Default).launch {
+            Rules.restarts.collect { mainHandler.post { reconnect() } }
+        }
         counter = CoroutineScope(Dispatchers.Default).launch {
             Engine.events.map { list -> list.count { it.blocked } }.distinctUntilChanged().collect { blocked ->
                 getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(blocked))
@@ -161,12 +181,30 @@ class WardenVpnService : VpnService(), Bridge {
         }
     }
 
-    private fun shutdown() {
-        counter?.cancel()
+    /** Rebuild the tunnel in place, e.g. after the excluded-apps list changed. */
+    private fun reconnect() {
+        if (tunnel == null) return
+        teardown()
+        try {
+            connect()
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) { // firestack throws plain Exception
+            Log.e(TAG, "tunnel restart failed", e)
+            shutdown()
+        }
+    }
+
+    private fun teardown() {
+        listOfNotNull(counter, resets, restarts).forEach { it.cancel() }
         counter = null
+        resets = null
+        restarts = null
         runCatching { cm.unregisterNetworkCallback(networkCallback) }
         tunnel?.disconnect()
         tunnel = null
+    }
+
+    private fun shutdown() {
+        teardown()
         Engine.setRunning(false)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

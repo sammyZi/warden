@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -298,6 +299,34 @@ private fun AccessCard(uid: Int, name: String) {
             allowed = !rule.blockCellular,
             description = stringResource(R.string.apps_cellular_for, name),
         ) { AppRules.set(uid, rule.copy(blockCellular = !it)) }
+        HorizontalDivider(color = c.outline)
+        // Skipping routes the app around the VPN entirely: no filtering, and nothing logged.
+        val context = LocalContext.current
+        val packages = remember(uid) { context.packageManager.getPackagesForUid(uid)?.toList().orEmpty() }
+        val excluded by AppRules.excluded.collectAsState()
+        val skipped = packages.isNotEmpty() && packages.any { it in excluded }
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                painterResource(DesignR.drawable.ph_eye_slash_light),
+                null,
+                Modifier.size(20.dp),
+                tint = if (skipped) c.warning else c.text,
+            )
+            Column(Modifier.weight(1f).padding(start = Spacing.m)) {
+                Text(stringResource(R.string.apps_skip), style = Warden.type.body)
+                Text(
+                    stringResource(if (skipped) R.string.apps_skip_on else R.string.apps_skip_off).uppercase(),
+                    style = Warden.type.caption,
+                    color = if (skipped) c.warning else c.muted,
+                )
+            }
+            WardenSwitch(
+                skipped,
+                { AppRules.setExcluded(packages, it) },
+                contentDescription = stringResource(R.string.apps_skip_for, name),
+                enabled = packages.isNotEmpty(),
+            )
+        }
     }
 }
 

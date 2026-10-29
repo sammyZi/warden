@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -73,6 +75,14 @@ fun AppsScreen(
     modifier: Modifier = Modifier,
 ) {
     BackHandler(enabled = openUid != null) { onOpen(null) }
+    // Owned here, not by the list, so opening an app and coming back keeps the scroll position
+    // and doesn't replay the entrance stagger.
+    val listState = rememberLazyListState()
+    var firstAppearance by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        delay(FIRST_APPEARANCE_MS)
+        firstAppearance = false
+    }
     val reduceMotion = Warden.reduceMotion
     SharedTransitionLayout(modifier.fillMaxSize()) {
         AnimatedContent(
@@ -93,7 +103,7 @@ fun AppsScreen(
         ) { uid ->
             val shared = Shared(this@SharedTransitionLayout, this)
             if (uid == null) {
-                AppList(events, appLabel, appIcon, shared, onOpen = { onOpen(it) })
+                AppList(events, appLabel, appIcon, shared, listState, firstAppearance, onOpen = { onOpen(it) })
             } else {
                 AppDetail(uid, events, appLabel, appIcon, shared, onBack = { onOpen(null) })
             }
@@ -127,6 +137,8 @@ private fun AppList(
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
     shared: Shared,
+    listState: LazyListState,
+    firstAppearance: Boolean,
     onOpen: (Int) -> Unit,
 ) {
     val c = Warden.colors
@@ -150,15 +162,11 @@ private fun AppList(
         }
         return
     }
-    var firstAppearance by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        delay(FIRST_APPEARANCE_MS)
-        firstAppearance = false
-    }
     val most = apps.first().connections.coerceAtLeast(1)
 
     LazyColumn(
         Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.l),
         verticalArrangement = Arrangement.spacedBy(Spacing.s),
     ) {

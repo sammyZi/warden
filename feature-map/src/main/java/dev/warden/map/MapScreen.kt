@@ -13,8 +13,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import dev.warden.design.Radii
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
@@ -87,7 +91,7 @@ fun MapScreen(
     var appFilter by rememberSaveable { mutableStateOf<Int?>(null) }
     val topApps = remember(events) {
         events.filter { it.kind != "dns" }.groupingBy { it.uid }.eachCount()
-            .entries.sortedByDescending { it.value }.take(MAX_APP_CHIPS).map { it.key }
+            .entries.sortedByDescending { it.value }.map { it.key to it.value }
     }
     val destinations = remember(events, g, appFilter) {
         aggregate(if (appFilter == null) events else events.filter { it.uid == appFilter }, g)
@@ -379,46 +383,114 @@ private fun loadGeo(context: Context): Geo = cachedGeo ?: synchronized(Geo::clas
 }
 
 private const val DEFAULT_LAT = 20f
-private const val MAX_APP_CHIPS = 12
 
-/** "All apps" plus the busiest apps, as chips; picking one narrows the whole globe to it. */
+/**
+ * One pill showing the current choice; tapping opens a searchable sheet of every app that connected,
+ * busiest first. Scales to any number of apps, unlike a sideways chip row.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppFilter(
-    apps: List<Int>,
+    apps: List<Pair<Int, Int>>,
     selected: Int?,
     onSelect: (Int?) -> Unit,
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
 ) {
     if (apps.isEmpty()) return
-    Row(
-        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.xl, vertical = Spacing.s),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-    ) {
-        AppChip(stringResource(R.string.map_all_apps), null, selected == null) { onSelect(null) }
-        apps.forEach { uid ->
-            val icon = appIcon(uid)
-            AppChip(appLabel(uid), icon, selected == uid) { onSelect(if (selected == uid) null else uid) }
+    val c = Warden.colors
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.s).heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(if (selected != null) c.primary else c.surface)
+                .border(1.dp, if (selected != null) c.primary else c.outline, RoundedCornerShape(50))
+                .clickable(role = Role.Button) { open = true }
+                .padding(start = if (selected != null) Spacing.s else Spacing.l, end = Spacing.m, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+        ) {
+            val ink = if (selected != null) c.onPrimary else c.text
+            selected?.let { uid -> appIcon(uid)?.let { Image(it, null, Modifier.size(24.dp).clip(CircleShape)) } }
+            Text(selected?.let(appLabel) ?: stringResource(R.string.map_all_apps), style = Warden.type.body, color = ink, maxLines = 1)
+            Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(14.dp).graphicsLayer { rotationZ = 90f }, tint = ink)
+        }
+    }
+    if (open) {
+        ModalBottomSheet(onDismissRequest = { open = false }, containerColor = c.background) {
+            AppPicker(apps, selected, appLabel, appIcon) {
+                onSelect(it)
+                open = false
+            }
         }
     }
 }
 
 @Composable
-private fun AppChip(label: String, icon: ImageBitmap?, selected: Boolean, onClick: () -> Unit) {
+private fun AppPicker(
+    apps: List<Pair<Int, Int>>,
+    selected: Int?,
+    appLabel: (Int) -> String,
+    appIcon: (Int) -> ImageBitmap?,
+    onPick: (Int?) -> Unit,
+) {
     val c = Warden.colors
-    Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-        Row(
+    var query by rememberSaveable { mutableStateOf("") }
+    val shown =
+        remember(apps, query) { apps.filter { (uid, _) -> query.isBlank() || appLabel(uid).contains(query.trim(), ignoreCase = true) } }
+    Column(Modifier.fillMaxHeight(0.85f)) {
+        BasicTextField(
+            query,
+            { query = it },
             Modifier
-                .clip(RoundedCornerShape(50))
-                .background(if (selected) c.primary else c.background)
-                .border(1.dp, if (selected) c.primary else c.outline, RoundedCornerShape(50))
-                .selectable(selected, role = Role.RadioButton, onClick = onClick)
-                .padding(start = if (icon != null) Spacing.s else Spacing.l, end = Spacing.l, top = 6.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-        ) {
-            if (icon != null) Image(icon, null, Modifier.size(22.dp).clip(CircleShape))
-            Text(label, style = Warden.type.label, color = if (selected) c.onPrimary else c.text, maxLines = 1)
+                .padding(horizontal = Spacing.xl)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.small))
+                .background(c.surfaceVariant)
+                .padding(horizontal = Spacing.l, vertical = Spacing.m),
+            singleLine = true,
+            textStyle = Warden.type.body.copy(color = c.text),
+            cursorBrush = SolidColor(c.accentInk),
+            decorationBox = { field ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                    Icon(painterResource(DesignR.drawable.ph_magnifying_glass), null, Modifier.size(18.dp), tint = c.muted)
+                    Box {
+                        if (query.isEmpty()) Text(stringResource(R.string.map_search_apps), style = Warden.type.body, color = c.muted)
+                        field()
+                    }
+                }
+            },
+        )
+        LazyColumn(Modifier.padding(top = Spacing.s)) {
+            if (query.isBlank()) item { PickerRow(stringResource(R.string.map_all_apps), null, null, selected == null) { onPick(null) } }
+            items(shown, key = { it.first }) { (uid, count) ->
+                PickerRow(appLabel(uid), appIcon(uid), count, selected == uid) { onPick(uid) }
+            }
         }
+    }
+}
+
+@Composable
+private fun PickerRow(label: String, icon: ImageBitmap?, count: Int?, selected: Boolean, onClick: () -> Unit) {
+    val c = Warden.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .background(if (selected) c.surfaceVariant else c.background)
+            .selectable(selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = Spacing.xl),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.m),
+    ) {
+        when {
+            icon != null -> Image(icon, null, Modifier.size(32.dp))
+            count == null -> IconBadge(DesignR.drawable.ph_globe_hemisphere_west, c.palette[4])
+            else -> IconBadge(DesignR.drawable.ph_squares_four, c.muted)
+        }
+        Text(label, Modifier.weight(1f), style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (count != null) Text(count.toString(), style = Warden.type.caption.tabular(), color = c.muted)
+        if (selected) Icon(painterResource(DesignR.drawable.ph_check), null, Modifier.size(18.dp), tint = c.accentInk)
     }
 }
