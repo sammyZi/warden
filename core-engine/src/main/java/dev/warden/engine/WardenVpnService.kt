@@ -28,6 +28,7 @@ import com.celzero.firestack.intra.Mark
 import com.celzero.firestack.intra.PreMark
 import com.celzero.firestack.intra.Tunnel
 import com.celzero.firestack.settings.Settings
+import dev.warden.rules.Blocklists
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -52,6 +53,11 @@ class WardenVpnService : VpnService(), Bridge {
             if (cm.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) return
             useSystemDns(lp)
         }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        Blocklists.init(this) // always-on VPN can start us before any activity
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -290,9 +296,6 @@ class WardenVpnService : VpnService(), Bridge {
             context.startService(Intent(context, WardenVpnService::class.java).setAction(ACTION_STOP))
         }
 
-        // ponytail: one hardcoded domain for the M0 spike; the rule engine replaces this in M3/M5.
-        const val BLOCKED_DOMAIN = "example.com"
-
         private const val TAG = "WardenVpn"
         private const val ACTION_STOP = "dev.warden.engine.STOP"
         private const val CHANNEL = "status"
@@ -306,7 +309,7 @@ class WardenVpnService : VpnService(), Bridge {
         private const val GATEWAY6 = "fd66:f83a:c650::1"
         private const val DNS6 = "fd66:f83a:c650::3"
 
-        internal fun isBlocked(name: String) = name == BLOCKED_DOMAIN || name.endsWith(".$BLOCKED_DOMAIN")
+        internal fun isBlocked(name: String) = Blocklists.isBlocked(name)
 
         private fun normalize(name: String) = name.trim().trimEnd('.').lowercase()
 

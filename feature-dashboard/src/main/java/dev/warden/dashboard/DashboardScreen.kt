@@ -60,6 +60,8 @@ fun DashboardScreen(
     onPowerClick: () -> Unit,
     onOpenMap: () -> Unit,
     onOpenApp: (Int) -> Unit,
+    blocklistsOn: Boolean,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = Warden.colors
@@ -79,6 +81,20 @@ fun DashboardScreen(
         )
         Spacer(Modifier.height(Spacing.l))
         ProtectionPill(state, onPowerClick)
+        if (!blocklistsOn) {
+            // Nothing is blocked until a list is on; say so where the zero shows up.
+            Spacer(Modifier.height(Spacing.m))
+            Tile(Modifier.fillMaxWidth(), onClick = onOpenSettings) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                    IconBadge(DesignR.drawable.ph_prohibit, c.blocked)
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.dashboard_lists_title), style = Warden.type.body.copy(fontWeight = FontWeight.Medium))
+                        Text(stringResource(R.string.dashboard_lists_body), style = Warden.type.label, color = c.muted)
+                    }
+                    Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(18.dp), tint = c.muted)
+                }
+            }
+        }
 
         Spacer(Modifier.height(Spacing.xl))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {

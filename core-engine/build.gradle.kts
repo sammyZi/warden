@@ -10,6 +10,7 @@ android {
 
 dependencies {
     api(libs.coroutines.core)
+    implementation(project(":core-rules"))
     // Published with <packaging>jar</packaging> but the file is an AAR.
     api(libs.firestack) { artifact { type = "aar" } }
 }

@@ -4,6 +4,12 @@
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
+    <string name="settings_blocklists">Blocklists</string>
+    <string name="settings_blocklists_note">Warden blocks the domains on the lists you switch on. Each list downloads from its publisher and refreshes weekly on Wi-Fi. Tap a list\'s status to update it now.</string>
+    <string name="settings_bl_downloading">Downloading…</string>
+    <string name="settings_bl_failed">Couldn\'t download · tap to retry</string>
+    <string name="settings_bl_entries">%1$s domains · updated %2$s</string>
+    <string name="settings_bl_license">Off · %1$s</string>
     <string name="settings_general">General</string>
     <string name="settings_replay_intro">Show the intro again</string>
     <string name="settings_about">About</string>

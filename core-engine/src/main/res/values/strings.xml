@@ -2,6 +2,6 @@
     <string name="engine_session">Warden</string>
     <string name="engine_channel">Protection status</string>
     <string name="engine_notif_title">Warden is on</string>
-    <string name="engine_notif_text">Watching connections. Spike build blocks example.com only.</string>
+    <string name="engine_notif_text">Watching your apps\' connections, on this phone only.</string>
     <string name="engine_notif_stop">Stop</string>
 </resources>

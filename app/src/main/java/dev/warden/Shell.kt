@@ -79,6 +79,7 @@ import dev.warden.design.Warden
 import dev.warden.design.ThemeMode
 import dev.warden.design.glow
 import dev.warden.engine.Engine
+import dev.warden.rules.Blocklists
 import dev.warden.engine.WardenVpnService
 import dev.warden.logs.LogScreen
 import dev.warden.map.MapScreen
@@ -103,6 +104,7 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
 
     val running by Engine.running.collectAsState()
     val events by Engine.events.collectAsState()
+    val lists by Blocklists.states.collectAsState()
     val (power, onPower) = rememberPower(running)
     val apps = remember { AppInfo(context.packageManager, context) }
     val reduceMotion = Warden.reduceMotion
@@ -134,6 +136,8 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
                     appIcon = apps::icon,
                     onPowerClick = onPower,
                     onOpenMap = { tab = Tab.Map },
+                    blocklistsOn = lists.values.any { it.enabled },
+                    onOpenSettings = { tab = Tab.Settings },
                     onOpenApp = {
                         openApp = it
                         tab = Tab.Apps

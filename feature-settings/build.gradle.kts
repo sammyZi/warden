@@ -12,4 +12,5 @@ android {
 
 dependencies {
     implementation(project(":core-design"))
+    implementation(project(":core-rules"))
 }

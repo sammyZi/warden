@@ -12,6 +12,8 @@
     <string name="dashboard_sq_domains">Domains</string>
     <string name="dashboard_activity">Activity · last 5 min</string>
     <string name="dashboard_activity_none">Nothing has connected in the last five minutes.</string>
+    <string name="dashboard_lists_title">Turn on a blocklist</string>
+    <string name="dashboard_lists_body">Warden only blocks what\'s on a list. Pick one in Settings.</string>
     <string name="dashboard_chatty">Chattiest apps</string>
     <string name="dashboard_chatty_empty">Apps show up here as soon as they connect.</string>
     <string name="dashboard_map_title">Where it went</string>

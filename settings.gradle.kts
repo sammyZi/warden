@@ -19,6 +19,7 @@ rootProject.name = "warden"
 include(
     ":app",
     ":core-engine",
+    ":core-rules",
     ":core-design",
     ":feature-dashboard",
     ":feature-apps",
