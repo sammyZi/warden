@@ -144,7 +144,10 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
                     },
                 )
                 Tab.Apps -> AppsScreen(events, apps::label, apps::icon, openApp, { openApp = it })
-                Tab.Map -> MapScreen(events, apps::label, apps::icon)
+                Tab.Map -> MapScreen(events, apps::label, apps::icon, onOpenApp = {
+                    openApp = it
+                    tab = Tab.Apps
+                })
                 Tab.Log -> LogScreen(events, running, apps::label, apps::icon)
                 Tab.Settings -> SettingsScreen(
                     version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty(),

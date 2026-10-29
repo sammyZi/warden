@@ -12,6 +12,12 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,13 +76,22 @@ fun MapScreen(
     events: List<NetEvent>,
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
+    onOpenApp: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val geo by produceState<Geo?>(null) { value = withContext(Dispatchers.IO) { loadGeo(context) } }
     val g = geo ?: return Box(modifier.fillMaxSize()) // ~150ms load, not worth a spinner
 
-    val destinations = remember(events, g) { aggregate(events, g) }
+    // Optional app filter: the globe, arcs and country list then show only that app's traffic.
+    var appFilter by rememberSaveable { mutableStateOf<Int?>(null) }
+    val topApps = remember(events) {
+        events.filter { it.kind != "dns" }.groupingBy { it.uid }.eachCount()
+            .entries.sortedByDescending { it.value }.take(MAX_APP_CHIPS).map { it.key }
+    }
+    val destinations = remember(events, g, appFilter) {
+        aggregate(if (appFilter == null) events else events.filter { it.uid == appFilter }, g)
+    }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = detail != null) { detail = null }
     val reduceMotion = Warden.reduceMotion
@@ -100,15 +115,18 @@ fun MapScreen(
     ) { iso ->
         val d = destinations.firstOrNull { it.country.iso == iso }
         if (iso == null || d == null) {
-            Overview(g, destinations, onOpen = { detail = it })
+            Overview(
+                g, destinations, onOpen = { detail = it },
+                filter = { AppFilter(topApps, appFilter, { appFilter = it }, appLabel, appIcon) },
+            )
         } else {
-            CountryDetail(d, appLabel, appIcon, onBack = { detail = null })
+            CountryDetail(d, appLabel, appIcon, onBack = { detail = null }, onOpenApp = onOpenApp)
         }
     }
 }
 
 @Composable
-private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -> Unit) {
+private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -> Unit, filter: @Composable () -> Unit) {
     val context = LocalContext.current
     val c = Warden.colors
     val home = remember(g) { homeCountry(context)?.let(g::country) }
@@ -123,6 +141,7 @@ private fun Overview(g: Geo, destinations: List<Destination>, onOpen: (String) -
                 Text(stringResource(R.string.map_title_sans), style = Warden.type.headline)
             }
         }
+        item { filter() }
         item {
             Globe(
                 geo = g,
@@ -206,7 +225,13 @@ private fun CountryRow(d: Destination, total: Int, onClick: () -> Unit) {
 
 /** Everything that went to one country: totals, the apps that went there, every connection. */
 @Composable
-private fun CountryDetail(d: Destination, appLabel: (Int) -> String, appIcon: (Int) -> ImageBitmap?, onBack: () -> Unit) {
+private fun CountryDetail(
+    d: Destination,
+    appLabel: (Int) -> String,
+    appIcon: (Int) -> ImageBitmap?,
+    onBack: () -> Unit,
+    onOpenApp: (Int) -> Unit,
+) {
     val c = Warden.colors
     val hue = countryHue(d.country.iso, c.palette)
     val time = remember { DateFormat.getTimeInstance(DateFormat.MEDIUM) }
@@ -260,13 +285,14 @@ private fun CountryDetail(d: Destination, appLabel: (Int) -> String, appIcon: (I
         item { SectionLabel(stringResource(R.string.map_apps), Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.s)) }
         items(byApp, key = { "app" + it.key }) { (uid, count) ->
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = Spacing.xl),
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onOpenApp(uid) }.padding(horizontal = Spacing.xl),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.m),
             ) {
                 AppIcon(uid, appIcon)
                 Text(appLabel(uid), Modifier.weight(1f), style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(count.toString(), style = Warden.type.caption.tabular(), color = c.muted)
+                Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(16.dp), tint = c.muted)
             }
         }
         item {
@@ -353,3 +379,46 @@ private fun loadGeo(context: Context): Geo = cachedGeo ?: synchronized(Geo::clas
 }
 
 private const val DEFAULT_LAT = 20f
+private const val MAX_APP_CHIPS = 12
+
+/** "All apps" plus the busiest apps, as chips; picking one narrows the whole globe to it. */
+@Composable
+private fun AppFilter(
+    apps: List<Int>,
+    selected: Int?,
+    onSelect: (Int?) -> Unit,
+    appLabel: (Int) -> String,
+    appIcon: (Int) -> ImageBitmap?,
+) {
+    if (apps.isEmpty()) return
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.xl, vertical = Spacing.s),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+    ) {
+        AppChip(stringResource(R.string.map_all_apps), null, selected == null) { onSelect(null) }
+        apps.forEach { uid ->
+            val icon = remember(uid) { appIcon(uid) }
+            AppChip(appLabel(uid), icon, selected == uid) { onSelect(if (selected == uid) null else uid) }
+        }
+    }
+}
+
+@Composable
+private fun AppChip(label: String, icon: ImageBitmap?, selected: Boolean, onClick: () -> Unit) {
+    val c = Warden.colors
+    Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(if (selected) c.primary else c.background)
+                .border(1.dp, if (selected) c.primary else c.outline, RoundedCornerShape(50))
+                .selectable(selected, role = Role.RadioButton, onClick = onClick)
+                .padding(start = if (icon != null) Spacing.s else Spacing.l, end = Spacing.l, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+        ) {
+            if (icon != null) Image(icon, null, Modifier.size(22.dp).clip(CircleShape))
+            Text(label, style = Warden.type.label, color = if (selected) c.onPrimary else c.text, maxLines = 1)
+        }
+    }
+}
