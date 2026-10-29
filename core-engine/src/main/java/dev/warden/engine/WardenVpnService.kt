@@ -1,0 +1,313 @@
+package dev.warden.engine
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
+import android.net.VpnService
+import android.os.Build
+import android.os.ParcelFileDescriptor
+import android.os.Process
+import android.util.Log
+import com.celzero.firestack.backend.Backend
+import com.celzero.firestack.backend.DNSOpts
+import com.celzero.firestack.backend.DNSSummary
+import com.celzero.firestack.backend.DomainOpts
+import com.celzero.firestack.backend.ServerSummary
+import com.celzero.firestack.backend.Tab
+import com.celzero.firestack.intra.Bridge
+import com.celzero.firestack.intra.FlowSummary
+import com.celzero.firestack.intra.Intra
+import com.celzero.firestack.intra.Mark
+import com.celzero.firestack.intra.PreMark
+import com.celzero.firestack.intra.Tunnel
+import java.net.Inet6Address
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicLong
+
+/**
+ * Local VpnService driving firestack. firestack owns the TUN fd, the TCP/IP stack and DNS;
+ * this class answers its per-flow and per-query callbacks (the [Bridge]).
+ * Integration modelled on Rethink's BraveVPNService/GoVpnAdapter (Apache-2.0), not copied.
+ */
+class WardenVpnService : VpnService(), Bridge {
+
+    @Volatile private var tunnel: Tunnel? = null
+    @Volatile private var dnsTransport = Backend.Default
+    private val ids = AtomicLong()
+    private val cm by lazy { getSystemService(ConnectivityManager::class.java) }
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) = useSystemDns(lp)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            shutdown()
+            return START_NOT_STICKY
+        }
+        if (tunnel == null) {
+            try {
+                connect()
+            } catch (e: Exception) {
+                Log.e(TAG, "tunnel start failed", e)
+                shutdown()
+                return START_NOT_STICKY
+            }
+        }
+        return START_STICKY
+    }
+
+    private fun connect() {
+        val lp = cm.getLinkProperties(cm.activeNetwork)
+        // Only claim IPv6 when the real network has it; then route all global unicast v6 so none leaks.
+        // ponytail: decided once at start; re-establish on v4<->v6 network changes comes with M2.
+        val has6 = lp?.routes.orEmpty().any { it.isDefaultRoute && it.destination.address is Inet6Address }
+
+        val builder = Builder()
+            .setSession(getString(R.string.engine_session))
+            .setMtu(MTU)
+            .addAddress(GATEWAY4, 24)
+            .addRoute("0.0.0.0", 0)
+            .addDnsServer(DNS4)
+            .addDisallowedApplication(packageName)
+        if (has6) {
+            builder.addAddress(GATEWAY6, 120)
+                .addRoute("2000::", 3)
+                .addRoute("64:ff9b::", 96)
+                .addDnsServer(DNS6)
+        }
+        val pfd = builder.establish() ?: error("VPN consent missing")
+
+        val fd = pfd.detachFd() // firestack owns and closes it from here on
+        tunnel = try {
+            Intra.connect(
+                fd.toLong(), MTU.toLong(), MTU.toLong(),
+                if (has6) "$GATEWAY4/24,$GATEWAY6/120" else "$GATEWAY4/24",
+                "$DNS4:53,[$DNS6]:53",
+                Intra.newBuiltinDefaultDNS(),
+                this,
+            )
+        } catch (e: Exception) {
+            ParcelFileDescriptor.adoptFd(fd).close()
+            throw e
+        }
+        useSystemDns(lp)
+        cm.registerDefaultNetworkCallback(networkCallback)
+
+        val n = notification()
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED)
+        } else {
+            startForeground(NOTIFICATION_ID, n)
+        }
+        Engine.setRunning(true)
+    }
+
+    /** Forward allowed queries to the underlying network's resolvers, like the phone would without us. */
+    private fun useSystemDns(lp: LinkProperties?) {
+        val t = tunnel ?: return
+        val csv = lp?.dnsServers.orEmpty().mapNotNull { it.hostAddress }.joinToString(",")
+        dnsTransport = if (csv.isNotEmpty() && runCatching { Intra.setSystemDNS(t, csv) }.isSuccess) {
+            Backend.System
+        } else {
+            Backend.Default
+        }
+    }
+
+    private fun shutdown() {
+        runCatching { cm.unregisterNetworkCallback(networkCallback) }
+        tunnel?.disconnect()
+        tunnel = null
+        Engine.setRunning(false)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    override fun onRevoke() = shutdown() // another VPN took over, or the user revoked consent
+
+    override fun onDestroy() {
+        if (tunnel != null) shutdown()
+        super.onDestroy()
+    }
+
+    private fun notification(): Notification {
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL, getString(R.string.engine_channel), NotificationManager.IMPORTANCE_LOW),
+        )
+        val stop = PendingIntent.getService(
+            this, 0, Intent(this, javaClass).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE,
+        )
+        val open = packageManager.getLaunchIntentForPackage(packageName)?.let {
+            PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
+        }
+        return Notification.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_shield_check)
+            .setContentTitle(getString(R.string.engine_notif_title))
+            .setContentText(getString(R.string.engine_notif_text))
+            .setOngoing(true)
+            .setContentIntent(open)
+            .addAction(Notification.Action.Builder(null, getString(R.string.engine_notif_stop), stop).build())
+            .build()
+    }
+
+    // ---- firestack callbacks: run on Go threads, keep them short and never block ----
+
+    override fun protect(who: String, fd: Long) {
+        protect(fd.toInt())
+    }
+
+    // ponytail: protect only; Rethink also binds to a specific underlying network (multi-network routing).
+    override fun bind4(who: String, addrport: String, fd: Long) {
+        protect(fd.toInt())
+    }
+
+    override fun bind6(who: String, addrport: String, fd: Long) {
+        protect(fd.toInt())
+    }
+
+    /** Called when firestack doesn't know the owner UID. Below Q it reads /proc/net itself. */
+    override fun preflow(protocol: Int, uid: Int, src: String, dst: String): PreMark {
+        val owner = if (uid >= 0 || Build.VERSION.SDK_INT < 29) {
+            uid
+        } else {
+            runCatching { cm.getConnectionOwnerUid(protocol, socketAddress(src), socketAddress(dst)) }
+                .getOrDefault(UNKNOWN_UID)
+        }
+        return PreMark().apply {
+            this.uid = owner.toString()
+            isUidSelf = owner == Process.myUid()
+        }
+    }
+
+    override fun flow(
+        protocol: Int,
+        uid: Int,
+        src: String,
+        dst: String,
+        origdsts: String,
+        domains: String,
+        probableDomains: String,
+        blocklists: String,
+        dstIsAlg: Boolean,
+    ): Mark {
+        val cid = ids.incrementAndGet().toString()
+        val toOurDns = host(dst) == DNS4 || host(dst) == DNS6
+        val names = (domains.split(',') + probableDomains.split(',')).map(::normalize).filter { it.isNotEmpty() }
+        val blocked = !toOurDns && names.any(::isBlocked)
+        if (!toOurDns) {
+            Engine.record(
+                NetEvent(cid, System.currentTimeMillis(), uid, protocolName(protocol), names.firstOrNull(), dst, blocked),
+            )
+        }
+        return Mark().apply {
+            // Base = handled inside the tunnel (our fake DNS), Exit = dial out directly, Block = refuse.
+            pidcsv = when {
+                toOurDns -> Backend.Base
+                blocked -> Backend.Block
+                else -> Backend.Exit
+            }
+            this.cid = cid
+            this.uid = uid.toString()
+        }
+    }
+
+    override fun inflow(protocol: Int, uid: Int, src: String, dst: String): Mark = Mark().apply {
+        pidcsv = Backend.Exit
+        cid = ids.incrementAndGet().toString()
+        this.uid = uid.toString()
+    }
+
+    override fun flowing(m: Mark?) = Unit
+
+    override fun postflow(s: FlowSummary?) {
+        if (s != null) Engine.closed(s.id, up = s.tx, down = s.rx)
+    }
+
+    override fun onQuery(who: String, uid: String, domain: String, qtyp: Long): DNSOpts = DNSOpts().apply {
+        this.uid = uid
+        ipcsv = ""
+        tidcsv = if (isBlocked(normalize(domain))) Backend.BlockAll else dnsTransport
+    }
+
+    override fun onResponse(s: DNSSummary?) {
+        val name = normalize(s?.qName ?: return)
+        if (name.isEmpty()) return
+        Engine.record(
+            NetEvent(
+                id = "d" + ids.incrementAndGet(),
+                time = System.currentTimeMillis(),
+                uid = s.uid.toIntOrNull() ?: UNKNOWN_UID,
+                kind = "dns",
+                domain = name,
+                target = s.rData.ifEmpty { "no answer" },
+                blocked = isBlocked(name),
+            ),
+        )
+    }
+
+    override fun onPrequery(who: String, uid: String, domain: String, qtyp: Long): DomainOpts? = null
+
+    override fun onUpstreamAnswer(who: String, smm: DNSSummary?, forPref: DNSOpts?, unmodifiedipcsv: String) = forPref
+
+    override fun svcRoute(sid: String, pid: String, network: String, sipport: String, dipport: String) = Tab()
+
+    override fun onSvcComplete(p0: ServerSummary?) = Unit
+    override fun onDNSAdded(id: String) = Unit
+    override fun onDNSRemoved(id: String) = Unit
+    override fun onDNSStopped() = Unit
+    override fun onProxiesStopped() = Unit
+    override fun onProxyAdded(id: String, handle: String) = Unit
+    override fun onProxyRemoved(id: String, handle: String) = Unit
+    override fun onProxyStopped(id: String, handle: String) = Unit
+    override fun onProxyUpdated(id: String, handle: String) = Unit
+
+    companion object {
+        fun start(context: Context) {
+            context.startForegroundService(Intent(context, WardenVpnService::class.java))
+        }
+
+        fun stop(context: Context) {
+            context.startService(Intent(context, WardenVpnService::class.java).setAction(ACTION_STOP))
+        }
+
+        // ponytail: one hardcoded domain for the M0 spike; the rule engine replaces this in M3/M5.
+        const val BLOCKED_DOMAIN = "example.com"
+
+        private const val TAG = "WardenVpn"
+        private const val ACTION_STOP = "dev.warden.engine.STOP"
+        private const val CHANNEL = "status"
+        private const val NOTIFICATION_ID = 1
+        private const val MTU = 1500
+        private const val UNKNOWN_UID = -1
+
+        // Private ranges, same shape as Rethink's defaults: .1 is us, .3 is the fake DNS server.
+        private const val GATEWAY4 = "10.111.222.1"
+        private const val DNS4 = "10.111.222.3"
+        private const val GATEWAY6 = "fd66:f83a:c650::1"
+        private const val DNS6 = "fd66:f83a:c650::3"
+
+        internal fun isBlocked(name: String) = name == BLOCKED_DOMAIN || name.endsWith(".$BLOCKED_DOMAIN")
+
+        private fun normalize(name: String) = name.trim().trimEnd('.').lowercase()
+
+        private fun host(ipPort: String) = ipPort.substringBeforeLast(':').trim('[', ']')
+
+        private fun socketAddress(ipPort: String) =
+            InetSocketAddress(InetAddress.getByName(host(ipPort)), ipPort.substringAfterLast(':').toInt())
+
+        private fun protocolName(p: Int) = when (p) {
+            6 -> "tcp"
+            17 -> "udp"
+            else -> "ip$p"
+        }
+    }
+}
