@@ -12,18 +12,11 @@ Every dependency, dataset and asset is checked before use. "Checked" = date the 
 | AndroidX / Jetpack Compose / Material 3 | UI | Apache-2.0 | Yes | Google | 2026-10-29 |
 | [Haze](https://github.com/chrisbanes/haze) (`haze`, `haze-glass` 2.0.1) | Liquid-glass tab bar (backdrop blur/refraction) | Apache-2.0 | Yes | Last push 2026-10-29, ~2.6k stars. GPU RenderEffect on API 31+, translucent fallback below. | 2026-10-30 |
 | kotlinx.coroutines | Flows, concurrency | Apache-2.0 | Yes | JetBrains | 2026-10-29 |
-
 | [Rubik](https://github.com/googlefonts/rubik) | The only UI font (variable TTF in `res/font`) | SIL OFL 1.1 | Yes (+ OFL text in assets) | | 2026-10-29 |
 | DB-IP IP to Country Lite | Offline IP-to-country (`assets/geo`) | CC BY 4.0 | Yes, credited in Settings → About | Monthly releases | 2026-10-29 |
 | Natural Earth (land, admin-0) | Globe land dots, country centroids | Public domain | Yes | | 2026-10-29 |
 | Cloudflare / Google / CloudFront / Fastly IP ranges | Anycast edge detection (`assets/geo/cdn.tsv`) | Published facts by each network | Yes | Rebuild with tools/geo/build_cdn.py | 2026-10-30 |
 | HaGeZi, OISD (GPL-3.0), StevenBlack (MIT) blocklists | Blocking | as listed | **No**, downloaded at runtime when switched on | Updated daily upstream | 2026-10-30 |
-
-## Planned (license checked, not yet added)
-
-| Component | License | Notes |
-|---|---|---|
-| [Rubik](https://github.com/googlefonts/rubik) font | SIL OFL 1.1 | Bundle the variable TTF in `res/font` (wght 300–900, has `tnum`). Ship `OFL.txt` alongside. |
 
 ## Rejected
 
