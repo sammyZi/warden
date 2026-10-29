@@ -17,6 +17,8 @@
         <item quantity="one">Show %d app</item>
         <item quantity="other">Show %d apps</item>
     </plurals>
+    <string name="map_edge">%1$s edge</string>
+    <string name="map_edge_explain">An anycast network: it answers from a server near you, wherever the company is registered. Services behind it (like Supabase) may store data elsewhere.</string>
     <string name="map_see_all">See all</string>
     <string name="map_countries">Countries</string>
     <string name="map_back">Back to the globe</string>

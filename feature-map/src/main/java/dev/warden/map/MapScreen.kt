@@ -100,7 +100,7 @@ fun MapScreen(
             .entries.sortedByDescending { it.value }.map { it.key to it.value }
     }
     val destinations = remember(events, g, appFilter) {
-        aggregate(if (appFilter.isEmpty()) events else events.filter { it.uid in appFilter }, g)
+        aggregate(if (appFilter.isEmpty()) events else events.filter { it.uid in appFilter }, g, homeCountry(context)?.let(g::country))
     }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = detail != null) { detail = null }
@@ -221,7 +221,11 @@ private fun CountryRow(d: Destination, total: Int, onClick: () -> Unit) {
     Tile(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.xs).fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
             Box(Modifier.size(40.dp).background(hue.copy(alpha = 0.18f), CircleShape), contentAlignment = Alignment.Center) {
-                Text(d.country.iso, style = Warden.type.label.copy(fontWeight = FontWeight.SemiBold), color = hue)
+                Text(
+                    d.country.iso.removePrefix(Geo.EDGE_PREFIX),
+                    style = Warden.type.label.copy(fontWeight = FontWeight.SemiBold),
+                    color = hue,
+                )
             }
             Column(Modifier.weight(1f)) {
                 Text(countryName(d.country.iso), style = Warden.type.body.copy(fontWeight = FontWeight.Medium), maxLines = 1)
@@ -277,9 +281,12 @@ private fun CountryDetail(
             Column(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.s)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                     Swatch(hue)
-                    SectionLabel(d.country.iso)
+                    SectionLabel(d.country.iso.removePrefix(Geo.EDGE_PREFIX))
                 }
                 Text(countryName(d.country.iso), style = Warden.type.headline)
+                if (d.country.iso.startsWith(Geo.EDGE_PREFIX)) {
+                    Text(stringResource(R.string.map_edge_explain), style = Warden.type.body, color = c.muted)
+                }
             }
         }
         item {
@@ -373,7 +380,15 @@ private fun BlockedTag(count: Int) {
     }
 }
 
-private fun countryName(iso: String): String = Locale.Builder().setRegion(iso).build().displayCountry.ifEmpty { iso }
+@Composable
+private fun countryName(iso: String): String = when (iso.removePrefix(Geo.EDGE_PREFIX).takeIf { iso.startsWith(Geo.EDGE_PREFIX) }) {
+    null -> Locale.Builder().setRegion(iso).build().displayCountry.ifEmpty { iso }
+    "CF" -> stringResource(R.string.map_edge, "Cloudflare")
+    "GO" -> stringResource(R.string.map_edge, "Google")
+    "AW" -> stringResource(R.string.map_edge, "Amazon CloudFront")
+    "FA" -> stringResource(R.string.map_edge, "Fastly")
+    else -> stringResource(R.string.map_edge, iso.removePrefix(Geo.EDGE_PREFIX))
+}
 
 /** Phone's network or SIM country: no location permission needed. */
 private fun homeCountry(context: Context): String? {
@@ -382,11 +397,18 @@ private fun homeCountry(context: Context): String? {
         .firstOrNull { !it.isNullOrBlank() }
 }
 
-/** Groups connections (not DNS answers) by destination country, busiest first. */
-internal fun aggregate(events: List<NetEvent>, geo: Geo): List<Destination> =
+/**
+ * Groups connections (not DNS answers) by destination country, busiest first. Anycast edges have no
+ * honest country, so they sit at [home]: they answer from a city near the user.
+ */
+internal fun aggregate(events: List<NetEvent>, geo: Geo, home: Country?): List<Destination> =
     events.asSequence()
         .filter { it.kind != "dns" }
         .mapNotNull { e -> geo.lookup(e.target.substringBeforeLast(':').trim('[', ']'))?.let { it to e } }
+        .map { (country, e) ->
+            val edge = country.iso.startsWith(Geo.EDGE_PREFIX)
+            (if (edge) country.copy(lat = home?.lat ?: DEFAULT_LAT, lon = home?.lon ?: 0f) else country) to e
+        }
         .groupBy({ it.first }, { it.second })
         .map { (country, list) -> Destination(country, list) }
         .sortedByDescending { it.connections }

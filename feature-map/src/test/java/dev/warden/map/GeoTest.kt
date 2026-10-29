@@ -10,14 +10,23 @@ class GeoTest {
     private val geo = Geo.load { File("src/main/assets/$it").inputStream() }
 
     @Test fun ipv4() {
-        assertEquals("US", geo.lookup("8.8.8.8")?.iso)
-        assertEquals("AU", geo.lookup("1.0.0.1")?.iso)
+        assertEquals("AU", geo.lookup("1.0.4.1")?.iso)
+        assertEquals("IN", geo.lookup("117.200.0.1")?.iso)
+    }
+
+    @Test fun anycastNetworksAreEdgesNotCountries() {
+        assertEquals("~CF", geo.lookup("104.16.0.1")?.iso) // Cloudflare (Supabase, many APIs)
+        assertEquals("~CF", geo.lookup("172.64.0.1")?.iso) // 1.1.1.1 isn't in Cloudflare's CDN list
+        assertEquals("~GO", geo.lookup("8.8.8.8")?.iso) // Google
+        assertEquals("~CF", geo.lookup("2606:4700::1")?.iso) // Cloudflare v6
+        assertEquals("~CF", geo.lookup("64:ff9b::6810:1")?.iso) // NAT64 of 104.16.0.1
     }
 
     @Test fun ipv6AndNat64() {
-        // DB-IP places Google's anycast v6 DNS range in Canada: country-level and anycast-blind.
-        assertEquals("CA", geo.lookup("2001:4860:4860::8888")?.iso)
-        assertEquals("US", geo.lookup("64:ff9b::808:808")?.iso) // NAT64 form of 8.8.8.8
+        // DB-IP alone puts Google's anycast v6 DNS in Canada; the edge list catches it first.
+        assertEquals("~GO", geo.lookup("2001:4860:4860::8888")?.iso)
+        assertEquals("IN", geo.lookup("2409:4000::1")?.iso) // Jio, a plain country range
+        assertEquals("~GO", geo.lookup("64:ff9b::808:808")?.iso) // NAT64 form of 8.8.8.8, a Google edge
     }
 
     @Test fun privateAndHostnamesAreUnknown() {

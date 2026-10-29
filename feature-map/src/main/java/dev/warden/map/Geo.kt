@@ -12,6 +12,7 @@ internal data class Country(val iso: String, val lat: Float, val lon: Float)
  * Offline IP-to-country index plus the land dots for the globe, built by tools/geo/build_geo.py
  * from DB-IP Lite (CC BY 4.0) and Natural Earth (public domain). Nothing is looked up online.
  */
+@Suppress("LongParameterList") // holds the loaded lookup tables, built only by load()
 internal class Geo(
     val countries: List<Country>,
     /** Land dots as unit vectors: x, y, z per dot. */
@@ -20,7 +21,11 @@ internal class Geo(
     private val v4Country: ByteArray,
     private val v6: LongArray,
     private val v6Country: ByteArray,
+    private val edges: List<Edge> = emptyList(),
 ) {
+    /** A CDN/anycast range. v4 bounds are unsigned 32-bit; v6 bounds are the high 64 bits, sign-flipped. */
+    internal class Edge(val v6: Boolean, val start: Long, val end: Long, val code: String)
+
     private val byIso = countries.associateBy { it.iso }
 
     fun country(iso: String): Country? = byIso[iso.uppercase()]
@@ -30,6 +35,7 @@ internal class Geo(
         // Only ever parse literals: InetAddress.getByName on a hostname would do a DNS lookup.
         if (!isIpLiteral(ip)) return null
         val bytes = runCatching { InetAddress.getByName(ip).address }.getOrNull() ?: return null
+        edgeOf(bytes)?.let { return Country(EDGE_PREFIX + it, Float.NaN, Float.NaN) }
         val index = when {
             bytes.size == 4 -> v4Country.at(search(v4, ByteBuffer.wrap(bytes).int xor Int.MIN_VALUE))
             // NAT64 (64:ff9b::/96) wraps an IPv4 address; common on IPv6-only mobile networks.
@@ -40,6 +46,21 @@ internal class Geo(
         return index?.let { countries.getOrNull(it) }
     }
 
+    /**
+     * Anycast networks (Cloudflare, Google, CloudFront, Fastly) answer from a city near the user, but
+     * IP databases file them under the owner's country. Recognise them by their published ranges.
+     */
+    private fun edgeOf(bytes: ByteArray): String? {
+        val nat64 = bytes.size == 16 && bytes.copyOf(12).contentEquals(NAT64)
+        return if (bytes.size == 4 || nat64) {
+            val key = ByteBuffer.wrap(bytes, if (nat64) 12 else 0, 4).int.toLong() and MASK32
+            edges.firstOrNull { !it.v6 && key in it.start..it.end }?.code
+        } else {
+            val key = ByteBuffer.wrap(bytes).long xor Long.MIN_VALUE
+            edges.firstOrNull { it.v6 && key in it.start..it.end }?.code
+        }
+    }
+
     private fun isIpLiteral(ip: String) =
         IPV4.matches(ip) || (':' in ip && ip.all { it.isLetterOrDigit() || it == ':' || it == '.' })
 
@@ -47,6 +68,25 @@ internal class Geo(
 
     companion object {
         private const val UNKNOWN = 255
+        private const val MASK32 = 0xFFFFFFFFL
+
+        /** Pseudo-country codes for anycast edges start with this, e.g. "~CF" for Cloudflare. */
+        const val EDGE_PREFIX = "~"
+
+        internal fun parseEdge(line: String): Edge? {
+            val (cidr, code) = line.split('	').takeIf { it.size == 2 } ?: return null
+            val bits = cidr.substringAfter('/').toIntOrNull() ?: return null
+            val bytes = runCatching { InetAddress.getByName(cidr.substringBefore('/')).address }.getOrNull() ?: return null
+            return if (bytes.size == 4) {
+                val base = ByteBuffer.wrap(bytes).int.toLong() and MASK32
+                val size = 1L shl (32 - bits)
+                Edge(false, base and (size - 1).inv() and MASK32, (base or (size - 1)) and MASK32, code)
+            } else {
+                val hi = ByteBuffer.wrap(bytes).long
+                val mask = if (bits >= 64) -1L else (-1L shl (64 - bits))
+                Edge(true, (hi and mask) xor Long.MIN_VALUE, (hi or mask.inv()) xor Long.MIN_VALUE, code)
+            }
+        }
         private val IPV4 = Regex("""\d{1,3}(\.\d{1,3}){3}""")
         private val NAT64 = byteArrayOf(0, 0x64, 0xff.toByte(), 0x9b.toByte(), 0, 0, 0, 0, 0, 0, 0, 0)
 
@@ -77,7 +117,8 @@ internal class Geo(
                 v6[i] = b6.long xor Long.MIN_VALUE
                 c6[i] = b6.get()
             }
-            return Geo(countries, land, v4, c4, v6, c6)
+            val edges = runCatching { open("geo/cdn.tsv").bufferedReader().readLines().mapNotNull(::parseEdge) }.getOrDefault(emptyList())
+            return Geo(countries, land, v4, c4, v6, c6, edges)
         }
 
         /** Writes the unit vector for (lat, lon) degrees into [out] at [at]; lon 0 faces the viewer. */
