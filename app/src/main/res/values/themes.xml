@@ -1,0 +1,7 @@
+<resources>
+    <!-- Window colour matches the Compose background so launch doesn't flash white in dark mode. -->
+    <style name="Theme.Warden" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/warden_background</item>
+    </style>
+    <color name="warden_background">#F4F4EE</color>
+</resources>

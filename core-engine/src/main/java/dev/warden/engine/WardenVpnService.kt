@@ -13,7 +13,6 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Build
-import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.util.Log
 import com.celzero.firestack.backend.Backend
@@ -28,6 +27,7 @@ import com.celzero.firestack.intra.Intra
 import com.celzero.firestack.intra.Mark
 import com.celzero.firestack.intra.PreMark
 import com.celzero.firestack.intra.Tunnel
+import com.celzero.firestack.settings.Settings
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicLong
 class WardenVpnService : VpnService(), Bridge {
 
     @Volatile private var tunnel: Tunnel? = null
+
     @Volatile private var dnsTransport = Backend.Default
     private val ids = AtomicLong()
     private val cm by lazy { getSystemService(ConnectivityManager::class.java) }
@@ -64,7 +65,7 @@ class WardenVpnService : VpnService(), Bridge {
             goForeground()
             try {
                 connect()
-            } catch (e: Exception) {
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) { // firestack throws plain Exception
                 Log.e(TAG, "tunnel start failed", e)
                 shutdown()
                 return START_NOT_STICKY
@@ -94,18 +95,17 @@ class WardenVpnService : VpnService(), Bridge {
         }
         val pfd = builder.establish() ?: error("VPN consent missing")
 
-        val fd = pfd.detachFd() // firestack owns and closes it from here on
-        tunnel = try {
+        // firestack dups the fd and closes its copy on disconnect; we close ours right away (as Rethink
+        // does). Handing over the original instead leaked it, so the VPN (key icon) outlived Stop.
+        Settings.dupTunFd(true)
+        tunnel = pfd.use {
             Intra.connect(
-                fd.toLong(), MTU.toLong(), MTU.toLong(),
+                it.fd.toLong(), MTU.toLong(), MTU.toLong(),
                 if (has6) "$GATEWAY4/24,$GATEWAY6/120" else "$GATEWAY4/24",
                 "$DNS4:53,[$DNS6]:53",
                 Intra.newBuiltinDefaultDNS(),
                 this,
             )
-        } catch (e: Exception) {
-            ParcelFileDescriptor.adoptFd(fd).close()
-            throw e
         }
         useSystemDns(lp)
         cm.registerDefaultNetworkCallback(networkCallback)

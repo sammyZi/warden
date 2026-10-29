@@ -1,0 +1,22 @@
+<resources>
+    <string name="dashboard_off_detail">Turn it on to see who your apps talk to. Nothing leaves this phone.</string>
+    <string name="dashboard_on_detail">Every app\'s connections pass through Warden, on this phone only.</string>
+    <string name="dashboard_off">Protection is off</string>
+    <string name="dashboard_connecting">Starting…</string>
+    <string name="dashboard_on">Protection is on</string>
+    <string name="dashboard_pill_off">Tap to start</string>
+    <string name="dashboard_pill_on">Tap to pause</string>
+    <string name="dashboard_sq_blocked">Blocked</string>
+    <string name="dashboard_sq_connections">Connects</string>
+    <string name="dashboard_sq_apps">Apps</string>
+    <string name="dashboard_sq_domains">Domains</string>
+    <string name="dashboard_activity">Activity · last 5 min</string>
+    <string name="dashboard_activity_none">Nothing has connected in the last five minutes.</string>
+    <string name="dashboard_chatty">Chattiest apps</string>
+    <string name="dashboard_chatty_empty">Apps show up here as soon as they connect.</string>
+    <string name="dashboard_map_title">Where it went</string>
+    <plurals name="dashboard_map_body">
+        <item quantity="one">%d domain reached. See it on the globe.</item>
+        <item quantity="other">%d domains reached. See them on the globe.</item>
+    </plurals>
+</resources>

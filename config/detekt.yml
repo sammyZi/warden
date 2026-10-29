@@ -1,0 +1,51 @@
+# Overrides on top of detekt's defaults (buildUponDefaultConfig = true).
+# Compose functions are PascalCase, take many parameters and are naturally long.
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][A-Za-z0-9_]*'
+  # Files are named after their main composable, which often sits beside a small enum.
+  MatchingDeclarationName:
+    active: false
+
+complexity:
+  LongMethod:
+    ignoreAnnotated: ['Composable']
+  LongParameterList:
+    ignoreAnnotated: ['Composable']
+    functionThreshold: 9 # hot-path draw helpers take their reused buffers explicitly
+  CyclomaticComplexMethod:
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    active: false
+
+style:
+  # Design tokens and geometry are numbers by nature; they live in named constants where it helps.
+  MagicNumber:
+    active: false
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']
+  ReturnCount:
+    active: false
+  MaxLineLength:
+    maxLineLength: 140
+
+formatting:
+  MaximumLineLength:
+    maxLineLength: 140
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  ArgumentListWrapping:
+    active: false
+  ParameterListWrapping:
+    active: false
+  Wrapping:
+    active: false
+  MultiLineIfElse:
+    active: false
+  ImportOrdering:
+    active: false
+  NoConsecutiveBlankLines:
+    active: true

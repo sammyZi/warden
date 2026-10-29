@@ -6,9 +6,10 @@
 
     <application
         android:allowBackup="false"
-        android:label="Warden"
+        android:enableOnBackInvokedCallback="true"
+        android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@style/Theme.Warden">
         <activity
             android:name=".MainActivity"
             android:exported="true">

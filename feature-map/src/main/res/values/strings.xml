@@ -1,0 +1,29 @@
+<resources>
+    <string name="map_title_sans">Where it went</string>
+    <string name="map_empty">Turn Warden on and arcs appear as your apps connect.</string>
+    <string name="map_hint">Drag to spin. Tap a dot or a country for all its traffic.</string>
+    <plurals name="map_globe_description">
+        <item quantity="one">Globe with connections to %d country. The list below has the same details.</item>
+        <item quantity="other">Globe with connections to %d countries. The list below has the same details.</item>
+    </plurals>
+    <string name="map_see_all">See all</string>
+    <string name="map_countries">Countries</string>
+    <string name="map_back">Back to the globe</string>
+    <string name="map_apps">Apps that went here</string>
+    <plurals name="map_all_traffic">
+        <item quantity="one">All traffic · %d connection</item>
+        <item quantity="other">All traffic · %d connections</item>
+    </plurals>
+    <string name="map_sq_connections">Connects</string>
+    <string name="map_sq_apps">Apps</string>
+    <string name="map_sq_domains">Domains</string>
+    <string name="map_sq_blocked">Blocked</string>
+    <plurals name="map_connections">
+        <item quantity="one">%d connection</item>
+        <item quantity="other">%d connections</item>
+    </plurals>
+    <plurals name="map_blocked">
+        <item quantity="one">%d blocked</item>
+        <item quantity="other">%d blocked</item>
+    </plurals>
+</resources>

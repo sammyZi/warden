@@ -1,0 +1,45 @@
+<resources>
+    <string name="apps_title">Apps</string>
+    <string name="apps_back">Back to apps</string>
+    <plurals name="apps_summary">
+        <item quantity="one">%d app connected recently. Tap one for details.</item>
+        <item quantity="other">%d apps connected recently. Tap one for details.</item>
+    </plurals>
+    <plurals name="apps_connections">
+        <item quantity="one">%d connection</item>
+        <item quantity="other">%d connections</item>
+    </plurals>
+    <plurals name="apps_domains">
+        <item quantity="one">%d domain</item>
+        <item quantity="other">%d domains</item>
+    </plurals>
+    <plurals name="apps_lookups">
+        <item quantity="one">%d lookup</item>
+        <item quantity="other">%d lookups</item>
+    </plurals>
+    <plurals name="apps_blocked">
+        <item quantity="one">%d blocked</item>
+        <item quantity="other">%d blocked</item>
+    </plurals>
+    <string name="apps_empty_title">Your apps line up here</string>
+    <string name="apps_empty_body">Turn Warden on and every app that connects gets a row, busiest first.</string>
+
+    <string name="apps_last_seen">Last seen %1$s</string>
+    <string name="apps_detail_summary">%1$s made %2$s to %3$s recently.</string>
+    <plurals name="apps_detail_blocked">
+        <item quantity="one">%d of them was blocked.</item>
+        <item quantity="other">%d of them were blocked.</item>
+    </plurals>
+    <string name="apps_detail_none_blocked">Nothing was blocked.</string>
+    <string name="apps_detail_data">About %1$s moved in total.</string>
+    <string name="apps_sq_connections">Connects</string>
+    <string name="apps_sq_domains">Domains</string>
+    <string name="apps_sq_blocked">Blocked</string>
+    <string name="apps_activity">Activity · last 5 min</string>
+    <string name="apps_activity_none">Nothing in the last five minutes.</string>
+    <string name="apps_domains_label">Domains · tap one to see its connections</string>
+    <string name="apps_expanded">Expanded</string>
+    <string name="apps_collapsed">Collapsed</string>
+    <string name="apps_blocked_word">Blocked</string>
+    <string name="apps_more">+%1$d more</string>
+</resources>

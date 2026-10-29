@@ -4,8 +4,8 @@ plugins {
 
 android {
     namespace = "dev.warden.engine"
-    compileSdk = 37
-    defaultConfig.minSdk = 26
+    compileSdk = libs.versions.compileSdk.get().toInt()
+    defaultConfig.minSdk = libs.versions.minSdk.get().toInt()
 }
 
 dependencies {

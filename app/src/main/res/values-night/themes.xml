@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.Warden" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/warden_background</item>
+    </style>
+    <color name="warden_background">#0E0F0D</color>
+</resources>

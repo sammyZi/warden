@@ -1,0 +1,269 @@
+package dev.warden.apps
+
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import dev.warden.design.Motion
+import dev.warden.design.SectionLabel
+import dev.warden.design.Spacing
+import dev.warden.design.Sparkline
+import dev.warden.design.StatSquare
+import dev.warden.design.Warden
+import dev.warden.design.formatBytes
+import dev.warden.design.tabular
+import dev.warden.engine.NetEvent
+import dev.warden.engine.activity
+import java.text.DateFormat
+import java.util.Date
+import dev.warden.design.R as DesignR
+
+/** One domain (or bare IP) this app reached, with every event for it, newest first. */
+private class DomainGroup(val name: String, val events: List<NetEvent>) {
+    val connections = events.count { it.kind != "dns" }
+    val lookups = events.count { it.kind == "dns" }
+    val blocked = events.count { it.blocked }
+    val last = events.maxOf { it.time }
+}
+
+/**
+ * Everything one app did, summary first: a plain sentence, three numbers, its activity line, then
+ * the domains it reached. Each domain expands in place (one level deep) to show its connections.
+ */
+@Composable
+internal fun AppDetail(
+    uid: Int,
+    events: List<NetEvent>,
+    appLabel: (Int) -> String,
+    appIcon: (Int) -> ImageBitmap?,
+    shared: Shared,
+    onBack: () -> Unit,
+) {
+    val c = Warden.colors
+    val mine = remember(events, uid) { events.filter { it.uid == uid } }
+    val domains = remember(mine) {
+        mine.groupBy { it.domain ?: it.target.substringBeforeLast(':').trim('[', ']') }
+            .map { (name, list) -> DomainGroup(name, list.sortedByDescending { it.time }) }
+            .sortedWith(compareByDescending<DomainGroup> { it.blocked > 0 }.thenByDescending { it.events.size })
+    }
+    val connections = mine.count { it.kind != "dns" }
+    val blocked = mine.count { it.blocked }
+    val bytes = mine.sumOf { it.bytesUp + it.bytesDown }
+    val time = remember { DateFormat.getTimeInstance(DateFormat.MEDIUM) }
+    val name = appLabel(uid)
+
+    LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onBack).padding(horizontal = Spacing.l),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+            ) {
+                Icon(
+                    painterResource(DesignR.drawable.ph_arrow_left),
+                    stringResource(R.string.apps_back),
+                    Modifier.size(20.dp),
+                    tint = c.text,
+                )
+                SectionLabel(stringResource(R.string.apps_title))
+            }
+        }
+        item {
+            Row(
+                Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.m),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.l),
+            ) {
+                AppIcon(uid, appIcon, 64.dp, shared.icon(uid))
+                Column(Modifier.weight(1f)) {
+                    Text(name, shared.name(uid), style = Warden.type.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (mine.isNotEmpty()) {
+                        SectionLabel(stringResource(R.string.apps_last_seen, time.format(Date(mine.maxOf { it.time }))))
+                    }
+                }
+            }
+        }
+        // Summary first, in plain words.
+        item {
+            Text(
+                buildString {
+                    append(
+                        stringResource(
+                            R.string.apps_detail_summary,
+                            name,
+                            pluralStringResource(R.plurals.apps_connections, connections, connections),
+                            pluralStringResource(R.plurals.apps_domains, domains.size, domains.size),
+                        ),
+                    )
+                    append(' ')
+                    append(
+                        if (blocked == 0) {
+                            stringResource(R.string.apps_detail_none_blocked)
+                        } else {
+                            pluralStringResource(R.plurals.apps_detail_blocked, blocked, blocked)
+                        },
+                    )
+                    if (bytes > 0) append(' ').append(stringResource(R.string.apps_detail_data, formatBytes(bytes)))
+                },
+                Modifier.padding(horizontal = Spacing.xl),
+                style = Warden.type.body,
+                color = c.muted,
+            )
+        }
+        item {
+            Row(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.l), horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                StatSquare(
+                    DesignR.drawable.ph_pulse,
+                    c.palette[0],
+                    connections,
+                    stringResource(R.string.apps_sq_connections),
+                    Modifier.weight(1f),
+                )
+                StatSquare(
+                    DesignR.drawable.ph_globe_hemisphere_west,
+                    c.palette[4],
+                    domains.size,
+                    stringResource(R.string.apps_sq_domains),
+                    Modifier.weight(1f),
+                )
+                StatSquare(DesignR.drawable.ph_prohibit, c.blocked, blocked, stringResource(R.string.apps_sq_blocked), Modifier.weight(1f))
+            }
+        }
+        item {
+            Column(Modifier.padding(horizontal = Spacing.xl), verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                SectionLabel(stringResource(R.string.apps_activity))
+                val activity = remember(mine) { mine.activity() }
+                if (activity.any { it > 0 }) {
+                    Sparkline(activity, c.accentInk, Modifier.fillMaxWidth().height(64.dp))
+                } else {
+                    Text(stringResource(R.string.apps_activity_none), style = Warden.type.body, color = c.muted)
+                }
+            }
+        }
+        item {
+            SectionLabel(
+                stringResource(R.string.apps_domains_label),
+                Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.xl, bottom = Spacing.s),
+            )
+        }
+        val most = domains.maxOfOrNull { it.events.size } ?: 1
+        items(domains, key = { it.name }) { d -> DomainRow(d, most, time) }
+        item { Box(Modifier.height(Spacing.xxl)) }
+    }
+}
+
+/** A domain with its share bar; tap to expand its recent connections in place. */
+@Composable
+private fun DomainRow(d: DomainGroup, most: Int, time: DateFormat) {
+    val c = Warden.colors
+    var open by rememberSaveable(d.name) { mutableStateOf(false) }
+    val turn by animateFloatAsState(if (open) 90f else 0f, Motion.emphasized(Motion.MEDIUM), label = "caret")
+    val stateText = stringResource(if (open) R.string.apps_expanded else R.string.apps_collapsed)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .animateContentSize(Motion.emphasized(Motion.LONG))
+            .clickable(role = Role.Button) { open = !open }
+            .semantics { stateDescription = stateText }
+            .padding(horizontal = Spacing.xl, vertical = Spacing.m),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    d.name,
+                    style = Warden.type.body,
+                    color = if (d.blocked > 0) c.blocked else c.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    listOfNotNull(
+                        pluralStringResource(R.plurals.apps_connections, d.connections, d.connections).takeIf { d.connections > 0 },
+                        pluralStringResource(R.plurals.apps_lookups, d.lookups, d.lookups).takeIf { d.lookups > 0 },
+                        time.format(Date(d.last)),
+                    ).joinToString(" · "),
+                    style = Warden.type.label.tabular(),
+                    color = c.muted,
+                )
+            }
+            if (d.blocked > 0) BlockedTag(d.blocked)
+            Icon(
+                painterResource(DesignR.drawable.ph_caret_right),
+                null,
+                Modifier.size(16.dp).graphicsLayer { rotationZ = turn },
+                tint = c.muted,
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(3.dp).background(c.surfaceVariant, RoundedCornerShape(2.dp))) {
+            Box(
+                Modifier
+                    .fillMaxWidth(d.events.size / most.toFloat())
+                    .fillMaxHeight()
+                    .background(if (d.blocked > 0) c.blocked else c.accentInk, RoundedCornerShape(2.dp)),
+            )
+        }
+        if (open) {
+            d.events.take(MAX_EXPANDED).forEach { e ->
+                Text(
+                    listOfNotNull(
+                        e.kind.uppercase(),
+                        e.target,
+                        time.format(Date(e.time)),
+                        if (e.bytesUp + e.bytesDown > 0) "↑${formatBytes(e.bytesUp)} ↓${formatBytes(e.bytesDown)}" else null,
+                        if (e.blocked) stringResource(R.string.apps_blocked_word).uppercase() else null,
+                    ).joinToString("  ·  "),
+                    Modifier
+                        .fillMaxWidth()
+                        .background(c.surface, RoundedCornerShape(Spacing.s))
+                        .padding(horizontal = Spacing.m, vertical = Spacing.s),
+                    style = Warden.type.caption.tabular(),
+                    color = if (e.blocked) c.blocked else c.muted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (d.events.size > MAX_EXPANDED) {
+                Text(stringResource(R.string.apps_more, d.events.size - MAX_EXPANDED), style = Warden.type.label, color = c.muted)
+            }
+        }
+    }
+    HorizontalDivider(Modifier.padding(horizontal = Spacing.xl), color = c.outline)
+}
+
+private const val MAX_EXPANDED = 10

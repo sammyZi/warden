@@ -16,4 +16,13 @@ dependencyResolutionManagement {
 
 rootProject.name = "warden"
 
-include(":app", ":core-engine")
+include(
+    ":app",
+    ":core-engine",
+    ":core-design",
+    ":feature-dashboard",
+    ":feature-apps",
+    ":feature-map",
+    ":feature-logs",
+    ":feature-settings",
+)

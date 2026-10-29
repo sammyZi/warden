@@ -1,0 +1,14 @@
+<resources>
+    <string name="log_title">Live log</string>
+    <string name="log_live">Live · %1$d events · %2$d blocked</string>
+    <string name="log_paused">Paused · %1$d events · %2$d blocked</string>
+    <string name="log_filter_all">All</string>
+    <string name="log_filter_blocked">Blocked</string>
+    <string name="log_filter_dns">DNS</string>
+    <string name="log_filter_connections">Connections</string>
+    <string name="log_blocked">Blocked</string>
+    <string name="log_empty_title">Quiet for now</string>
+    <string name="log_empty_body">Turn Warden on and every connection shows up here as it happens.</string>
+    <string name="log_filtered_title">Nothing here yet</string>
+    <string name="log_filtered_body">No recent events match this filter.</string>
+</resources>
