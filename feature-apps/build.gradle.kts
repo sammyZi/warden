@@ -14,5 +14,7 @@ dependencies {
     implementation(project(":core-design"))
     implementation(project(":core-engine"))
     implementation(project(":core-rules"))
+    implementation(project(":core-data"))
+    testImplementation(libs.junit)
     implementation(libs.activity.compose)
 }

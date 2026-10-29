@@ -171,7 +171,7 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
                         openApp = it
                         tab = Tab.Apps
                     })
-                    Tab.Log -> LogScreen(events, running, apps::label, apps::icon, onClear = History::clear)
+                    Tab.Log -> LogScreen(events, running, apps::label, apps::icon)
                     Tab.Settings -> SettingsScreen(
                         version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty(),
                         themeMode = themeMode,

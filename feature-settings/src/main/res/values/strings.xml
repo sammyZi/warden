@@ -40,6 +40,11 @@
     <string name="settings_general">General</string>
     <string name="settings_replay_intro">Show the intro again</string>
 
+    <string name="settings_clear">Clear history</string>
+    <string name="settings_clear_title">Clear history?</string>
+    <string name="settings_clear_body">This deletes every saved connection on this phone. Your rules and blocklists stay.</string>
+    <string name="settings_clear_confirm">Clear</string>
+    <string name="settings_cancel">Cancel</string>
     <string name="settings_about">About</string>
     <string name="settings_promise">No account, no analytics, no cloud. Warden watches where your apps connect, on this phone, and never decrypts what they send.</string>
     <string name="settings_credits_title">Open-source credits</string>

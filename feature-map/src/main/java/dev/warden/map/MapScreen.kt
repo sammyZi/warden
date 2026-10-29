@@ -13,15 +13,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import dev.warden.design.Radii
-import dev.warden.design.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import dev.warden.data.History
 import dev.warden.data.Range
 import dev.warden.rules.Trackers
@@ -146,8 +145,14 @@ fun MapScreen(
             Overview(
                 g, destinations, onOpen = { detail = it },
                 filter = {
-                    AppFilter(topApps, appFilter, { appFilter = it }, appLabel, appIcon)
-                    MapFilters(scope, { scope = it }, blockedOnly, { blockedOnly = it }, trackersOnly, { trackersOnly = it })
+                    Row(
+                        Modifier.padding(horizontal = Spacing.xl),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AppFilter(topApps, appFilter, { appFilter = it }, appLabel, appIcon)
+                        TimeFilter(scope, { scope = it }, blockedOnly, { blockedOnly = it }, trackersOnly, { trackersOnly = it })
+                    }
                 },
             )
         } else {
@@ -460,7 +465,7 @@ private fun AppFilter(
     val c = Warden.colors
     var open by rememberSaveable { mutableStateOf(false) }
     val any = selected.isNotEmpty()
-    Box(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.s).heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+    Box(Modifier.padding(vertical = Spacing.s).heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
         Row(
             Modifier
                 .clip(RoundedCornerShape(50))
@@ -614,9 +619,9 @@ private fun Scope.since(): Long = when (this) {
     Scope.Month -> History.start(Range.Month)
 }
 
-/** Time span chips, then two toggles. One sideways-scrolling row. */
+/** A pill like the app picker: time span plus Blocked / Trackers toggles in one menu. Lime when not default. */
 @Composable
-private fun MapFilters(
+private fun TimeFilter(
     scope: Scope,
     onScope: (Scope) -> Unit,
     blockedOnly: Boolean,
@@ -624,27 +629,60 @@ private fun MapFilters(
     trackersOnly: Boolean,
     onTrackersOnly: (Boolean) -> Unit,
 ) {
-    Row(
-        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.xl),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Scope.entries.forEach { s ->
-            FilterChip(
-                stringResource(
-                    when (s) {
-                        Scope.Session -> R.string.map_scope_session
-                        Scope.Today -> R.string.map_scope_today
-                        Scope.Week -> R.string.map_scope_week
-                        Scope.Month -> R.string.map_scope_month
-                    },
-                ),
-                s == scope,
-                { onScope(s) },
-            )
+    val c = Warden.colors
+    var open by remember { mutableStateOf(false) }
+    val active = scope != Scope.Session || blockedOnly || trackersOnly
+    val ink = if (active) c.onPrimary else c.text
+    val label = listOfNotNull(
+        scopeLabel(scope),
+        stringResource(R.string.map_blocked_only).takeIf { blockedOnly },
+        stringResource(R.string.map_trackers_only).takeIf { trackersOnly },
+    ).joinToString(" · ")
+    Box(Modifier.padding(vertical = Spacing.s).heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(if (active) c.primary else c.surface)
+                .border(1.dp, if (active) c.primary else c.outline, RoundedCornerShape(50))
+                .clickable(role = Role.Button) { open = true }
+                .padding(start = Spacing.l, end = Spacing.m, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+        ) {
+            Text(label, style = Warden.type.body, color = ink, maxLines = 1)
+            Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(14.dp).graphicsLayer { rotationZ = 90f }, tint = ink)
         }
-        Box(Modifier.size(width = 1.dp, height = 24.dp).background(Warden.colors.outline))
-        FilterChip(stringResource(R.string.map_blocked_only), blockedOnly, { onBlockedOnly(!blockedOnly) })
-        FilterChip(stringResource(R.string.map_trackers_only), trackersOnly, { onTrackersOnly(!trackersOnly) })
+        DropdownMenu(open, { open = false }, containerColor = c.surface, shape = RoundedCornerShape(Radii.medium)) {
+            Scope.entries.forEach { s ->
+                MenuRow(scopeLabel(s), s == scope) {
+                    onScope(s)
+                    open = false
+                }
+            }
+            HorizontalDivider(color = c.outline)
+            MenuRow(stringResource(R.string.map_blocked_only), blockedOnly) { onBlockedOnly(!blockedOnly) }
+            MenuRow(stringResource(R.string.map_trackers_only), trackersOnly) { onTrackersOnly(!trackersOnly) }
+        }
     }
 }
+
+@Composable
+private fun MenuRow(label: String, checked: Boolean, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(label, style = Warden.type.body, color = Warden.colors.text) },
+        onClick = onClick,
+        trailingIcon = {
+            if (checked) Icon(painterResource(DesignR.drawable.ph_check), null, Modifier.size(18.dp), tint = Warden.colors.accentInk)
+        },
+    )
+}
+
+@Composable
+private fun scopeLabel(s: Scope): String = stringResource(
+    when (s) {
+        Scope.Session -> R.string.map_scope_session
+        Scope.Today -> R.string.map_scope_today
+        Scope.Week -> R.string.map_scope_week
+        Scope.Month -> R.string.map_scope_month
+    },
+)

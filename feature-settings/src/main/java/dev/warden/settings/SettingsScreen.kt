@@ -48,6 +48,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.warden.design.IconBadge
+import dev.warden.design.ButtonKind
+import dev.warden.design.WardenButton
+import dev.warden.data.History
+import androidx.compose.material3.AlertDialog
 import dev.warden.design.Motion
 import dev.warden.design.SectionLabel
 import dev.warden.design.SegmentedControl
@@ -195,6 +199,8 @@ private fun SettingsHome(
 
         Section(stringResource(R.string.settings_general)) {
             LinkRow(DesignR.drawable.ph_device_mobile_light, stringResource(R.string.settings_replay_intro), onReplayIntro)
+            HorizontalDivider(color = c.outline)
+            ClearHistoryRow()
         }
 
         Section(stringResource(R.string.settings_about)) {
@@ -299,6 +305,36 @@ private fun RefreshButton(listName: String, busy: Boolean, onClick: () -> Unit) 
             stringResource(R.string.settings_bl_refresh, listName),
             Modifier.size(20.dp).graphicsLayer { rotationZ = spin?.value ?: 0f },
             tint = if (busy) c.accentInk else c.muted,
+        )
+    }
+}
+
+/** Deletes all saved connections after a confirmation. Rules and blocklists are kept. */
+@Composable
+private fun ClearHistoryRow() {
+    val c = Warden.colors
+    var confirm by rememberSaveable { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable { confirm = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.m),
+    ) {
+        IconBadge(DesignR.drawable.ph_prohibit, c.blocked)
+        Text(stringResource(R.string.settings_clear), Modifier.weight(1f), style = Warden.type.body, color = c.blocked)
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(stringResource(R.string.settings_clear_title), style = Warden.type.title) },
+            text = { Text(stringResource(R.string.settings_clear_body), style = Warden.type.body) },
+            confirmButton = {
+                WardenButton(stringResource(R.string.settings_clear_confirm), {
+                    History.clear()
+                    confirm = false
+                }, kind = ButtonKind.Destructive)
+            },
+            dismissButton = { WardenButton(stringResource(R.string.settings_cancel), { confirm = false }, kind = ButtonKind.Text) },
+            containerColor = c.surface,
         )
     }
 }

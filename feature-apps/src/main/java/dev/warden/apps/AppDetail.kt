@@ -49,6 +49,8 @@ import dev.warden.design.StatSquare
 import dev.warden.design.Warden
 import dev.warden.design.formatBytes
 import dev.warden.design.Tile
+import dev.warden.design.ButtonKind
+import dev.warden.design.WardenButton
 import dev.warden.design.WardenSwitch
 import dev.warden.rules.AppRule
 import dev.warden.rules.AppRules
@@ -130,6 +132,17 @@ internal fun AppDetail(
                     }
                 }
             }
+        }
+        item {
+            var showReport by remember { mutableStateOf(false) }
+            WardenButton(
+                stringResource(R.string.report_open),
+                { showReport = true },
+                Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.m).fillMaxWidth(),
+                kind = ButtonKind.Tonal,
+                icon = DesignR.drawable.ph_shield_check,
+            )
+            if (showReport) ReportCardSheet(uid, name, appIcon(uid)) { showReport = false }
         }
         item { AccessCard(uid, name) }
         // Summary first, in plain words.
