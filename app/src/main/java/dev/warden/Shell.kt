@@ -205,9 +205,9 @@ private fun BottomBar(current: Tab, haze: HazeState, modifier: Modifier, onSelec
     // Frosted, not clear glass: enough blur and tint that text scrolling behind never fights the labels.
     val style = remember(c) {
         HazeBlurStyle {
-            blurRadius(20.dp)
+            blurRadius(32.dp)
             backgroundColor(c.background)
-            colorEffects(listOf(HazeColorEffect.tint(c.background.copy(alpha = 0.72f))))
+            colorEffects(listOf(HazeColorEffect.tint(c.background.copy(alpha = 0.6f))))
             noiseFactor(0.04f)
         }
     }
