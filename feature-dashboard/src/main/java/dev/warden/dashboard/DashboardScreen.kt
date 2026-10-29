@@ -1,6 +1,10 @@
 package dev.warden.dashboard
 
 import androidx.compose.animation.animateColorAsState
+import android.content.Intent
+import android.net.ConnectivityManager
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -81,6 +86,7 @@ fun DashboardScreen(
         )
         Spacer(Modifier.height(Spacing.l))
         ProtectionPill(state, onPowerClick)
+        PrivateDnsWarning()
         if (!blocklistsOn) {
             // Nothing is blocked until a list is on; say so where the zero shows up.
             Spacer(Modifier.height(Spacing.m))
@@ -236,3 +242,30 @@ private class Stats(events: List<NetEvent>) {
 }
 
 private const val TOP_APPS = 4
+
+/**
+ * Strict Private DNS (a hostname like dns.google in system settings) sends DNS over TLS straight past
+ * Warden, so domain blocking silently stops. Detect it and point to the setting.
+ */
+@Composable
+private fun PrivateDnsWarning() {
+    val context = LocalContext.current
+    val c = Warden.colors
+    // Re-checked whenever Home is shown; it changes only from system settings.
+    val strict = remember {
+        if (Build.VERSION.SDK_INT < 28) return@remember null
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        cm.getLinkProperties(cm.activeNetwork)?.privateDnsServerName
+    } ?: return
+    Spacer(Modifier.height(Spacing.m))
+    Tile(Modifier.fillMaxWidth(), onClick = { context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) }) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+            IconBadge(DesignR.drawable.ph_lock_simple, c.warning)
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.dashboard_pdns_title), style = Warden.type.body.copy(fontWeight = FontWeight.Medium))
+                Text(stringResource(R.string.dashboard_pdns_body, strict), style = Warden.type.label, color = c.muted)
+            }
+            Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(18.dp), tint = c.muted)
+        }
+    }
+}

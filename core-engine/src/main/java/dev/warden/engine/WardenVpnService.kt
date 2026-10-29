@@ -29,6 +29,12 @@ import com.celzero.firestack.intra.PreMark
 import com.celzero.firestack.intra.Tunnel
 import com.celzero.firestack.settings.Settings
 import dev.warden.rules.Rules
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -42,6 +48,7 @@ import java.util.concurrent.atomic.AtomicLong
 class WardenVpnService : VpnService(), Bridge {
 
     @Volatile private var tunnel: Tunnel? = null
+    private var counter: Job? = null
 
     @Volatile private var dnsTransport = Backend.Default
 
@@ -125,10 +132,16 @@ class WardenVpnService : VpnService(), Bridge {
         useSystemDns(lp)
         cm.registerDefaultNetworkCallback(networkCallback)
         Engine.setRunning(true)
+        // Keep the notification's blocked count current; events already arrive in 500ms batches.
+        counter = CoroutineScope(Dispatchers.Default).launch {
+            Engine.events.map { list -> list.count { it.blocked } }.distinctUntilChanged().collect { blocked ->
+                getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(blocked))
+            }
+        }
     }
 
     private fun goForeground() {
-        val n = notification()
+        val n = notification(0)
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED)
         } else {
@@ -149,6 +162,8 @@ class WardenVpnService : VpnService(), Bridge {
     }
 
     private fun shutdown() {
+        counter?.cancel()
+        counter = null
         runCatching { cm.unregisterNetworkCallback(networkCallback) }
         tunnel?.disconnect()
         tunnel = null
@@ -164,7 +179,7 @@ class WardenVpnService : VpnService(), Bridge {
         super.onDestroy()
     }
 
-    private fun notification(): Notification {
+    private fun notification(blocked: Int): Notification {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL, getString(R.string.engine_channel), NotificationManager.IMPORTANCE_LOW),
@@ -178,7 +193,11 @@ class WardenVpnService : VpnService(), Bridge {
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_shield_check)
             .setContentTitle(getString(R.string.engine_notif_title))
-            .setContentText(getString(R.string.engine_notif_text))
+            .setContentText(
+                if (blocked == 0) getString(R.string.engine_notif_text)
+                else resources.getQuantityString(R.plurals.engine_notif_blocked, blocked, blocked),
+            )
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(null, getString(R.string.engine_notif_stop), stop).build())
