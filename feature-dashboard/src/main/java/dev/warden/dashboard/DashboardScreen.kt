@@ -148,7 +148,7 @@ fun DashboardScreen(
             stats.top.forEachIndexed { i, (uid, count) ->
                 if (i > 0) HorizontalDivider(color = c.outline)
                 ListRow({ onOpenApp(uid) }) {
-                    val icon = remember(uid) { appIcon(uid) }
+                    val icon = appIcon(uid)
                     if (icon != null) Image(icon, null, Modifier.size(32.dp)) else IconBadge(DesignR.drawable.ph_squares_four, c.palette[i])
                     Text(appLabel(uid), Modifier.weight(1f), style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(count.toString(), style = Warden.type.caption.tabular(), color = c.muted)

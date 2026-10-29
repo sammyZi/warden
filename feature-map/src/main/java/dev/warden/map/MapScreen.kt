@@ -334,7 +334,7 @@ private fun CountryDetail(
 
 @Composable
 private fun AppIcon(uid: Int, appIcon: (Int) -> ImageBitmap?) {
-    val icon = remember(uid) { appIcon(uid) }
+    val icon = appIcon(uid)
     if (icon != null) Image(icon, null, Modifier.size(32.dp)) else IconBadge(DesignR.drawable.ph_squares_four, Warden.colors.muted)
 }
 
@@ -397,7 +397,7 @@ private fun AppFilter(
     ) {
         AppChip(stringResource(R.string.map_all_apps), null, selected == null) { onSelect(null) }
         apps.forEach { uid ->
-            val icon = remember(uid) { appIcon(uid) }
+            val icon = appIcon(uid)
             AppChip(appLabel(uid), icon, selected == uid) { onSelect(if (selected == uid) null else uid) }
         }
     }

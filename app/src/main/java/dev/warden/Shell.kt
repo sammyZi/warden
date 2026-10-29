@@ -52,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -84,7 +85,11 @@ import dev.warden.engine.WardenVpnService
 import dev.warden.logs.LogScreen
 import dev.warden.map.MapScreen
 import dev.warden.settings.SettingsScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import dev.warden.design.R as DesignR
 
 private enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
@@ -273,7 +278,9 @@ internal class AppInfo(private val pm: PackageManager, context: Context) {
     private val system = context.getString(R.string.uid_system)
     private val iconPx = (40 * context.resources.displayMetrics.density).toInt()
     private val labels = HashMap<Int, String>()
-    private val icons = HashMap<Int, ImageBitmap?>()
+    private val icons = mutableStateMapOf<Int, ImageBitmap?>()
+    private val loading = HashSet<Int>() // main thread only
+    private val scope = MainScope()
 
     private fun pkg(uid: Int) = if (uid >= Process.FIRST_APPLICATION_UID) pm.getPackagesForUid(uid)?.firstOrNull() else null
 
@@ -286,19 +293,28 @@ internal class AppInfo(private val pm: PackageManager, context: Context) {
         }
     }
 
+    /**
+     * Cached icon, or null while it loads off the main thread. The cache is snapshot state, so
+     * whoever read null recomposes when the icon lands. Decoding on the main thread caused stutter.
+     */
     fun icon(uid: Int): ImageBitmap? {
-        if (uid in icons) return icons[uid]
-        val bitmap = pkg(uid)?.let { pkg ->
-            runCatching {
-                val d = pm.getApplicationIcon(pkg)
-                Bitmap.createBitmap(iconPx, iconPx, Bitmap.Config.ARGB_8888).also {
-                    d.setBounds(0, 0, iconPx, iconPx)
-                    d.draw(android.graphics.Canvas(it))
-                }.asImageBitmap()
-            }.getOrNull()
+        if (uid !in icons && loading.add(uid)) {
+            scope.launch {
+                val bitmap = withContext(Dispatchers.IO) { decode(uid) }
+                icons[uid] = bitmap
+            }
         }
-        icons[uid] = bitmap
-        return bitmap
+        return icons[uid]
+    }
+
+    private fun decode(uid: Int): ImageBitmap? = pkg(uid)?.let { pkg ->
+        runCatching {
+            val d = pm.getApplicationIcon(pkg)
+            Bitmap.createBitmap(iconPx, iconPx, Bitmap.Config.ARGB_8888).also {
+                d.setBounds(0, 0, iconPx, iconPx)
+                d.draw(android.graphics.Canvas(it))
+            }.asImageBitmap()
+        }.getOrNull()
     }
 }
 

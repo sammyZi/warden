@@ -113,7 +113,7 @@ internal class Shared(private val layout: SharedTransitionScope, private val vis
 
 @Composable
 internal fun AppIcon(uid: Int, appIcon: (Int) -> ImageBitmap?, size: Dp, modifier: Modifier = Modifier) {
-    val icon = remember(uid) { appIcon(uid) }
+    val icon = appIcon(uid)
     if (icon != null) {
         Image(icon, null, modifier.size(size))
     } else {

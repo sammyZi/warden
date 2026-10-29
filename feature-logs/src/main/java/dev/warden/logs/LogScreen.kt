@@ -130,7 +130,7 @@ fun LogScreen(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.m),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val icon = remember(e.uid) { appIcon(e.uid) }
+                val icon = appIcon(e.uid)
                 if (icon != null) Image(icon, null, Modifier.size(36.dp)) else IconBadge(DesignR.drawable.ph_squares_four, c.muted)
                 Column(Modifier.weight(1f)) {
                     Text(
