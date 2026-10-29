@@ -55,4 +55,15 @@
     <string name="rule_allow_here">Allow for this app</string>
     <string name="rule_block_here">Block for this app</string>
     <string name="rule_block_everywhere">Block everywhere</string>
+    <string name="apps_trackers">Trackers</string>
+    <string name="apps_trackers_none">No known trackers in this app\'s recent traffic.</string>
+    <string name="apps_trackers_sentence">Contacted %1$s from %2$s.</string>
+    <plurals name="apps_n_trackers">
+        <item quantity="one">%d tracker</item>
+        <item quantity="other">%d trackers</item>
+    </plurals>
+    <plurals name="apps_n_companies">
+        <item quantity="one">%d company</item>
+        <item quantity="other">%d companies</item>
+    </plurals>
 </resources>

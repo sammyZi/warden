@@ -52,6 +52,8 @@ import dev.warden.design.SegmentedControl
 import dev.warden.data.History
 import dev.warden.data.Range
 import dev.warden.data.RangeStats
+import dev.warden.rules.TrackerSummary
+import dev.warden.rules.summarizeTrackers
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -81,6 +83,8 @@ fun DashboardScreen(
     val stats by remember(range) { History.stats(range) }.collectAsState(RangeStats(0, 0, 0, 0, 0))
     val activity by remember(range) { History.activity(range) }.collectAsState(emptyList())
     val top by remember(range) { History.apps(range, limit = TOP_APPS) }.collectAsState(emptyList())
+    val domains by remember(range) { History.domains(range) }.collectAsState(emptyList())
+    val trackers = remember(domains) { summarizeTrackers(domains) }
 
     Column(
         modifier
@@ -150,6 +154,8 @@ fun DashboardScreen(
             )
         }
 
+        Spacer(Modifier.height(Spacing.xl))
+        TrackersCard(trackers, range)
         Spacer(Modifier.height(Spacing.xl))
         SectionLabel(
             stringResource(R.string.dashboard_activity) + " · " + stringResource(
@@ -300,3 +306,42 @@ private fun PrivateDnsWarning() {
         }
     }
 }
+
+/** "Your apps contacted 37 trackers from 12 companies today", then the top companies and what they do. */
+@Composable
+private fun TrackersCard(t: TrackerSummary, range: Range) {
+    val c = Warden.colors
+    SectionLabel(stringResource(R.string.dashboard_trackers))
+    Spacer(Modifier.height(Spacing.s))
+    Tile(Modifier.fillMaxWidth()) {
+        val period = stringResource(
+            when (range) {
+                Range.Today -> R.string.dashboard_period_today
+                Range.Week -> R.string.dashboard_period_week
+                Range.Month -> R.string.dashboard_period_month
+            },
+        )
+        Text(
+            if (t.trackers == 0) {
+                stringResource(R.string.dashboard_trackers_none, period)
+            } else {
+                stringResource(
+                    R.string.dashboard_trackers_sentence,
+                    pluralStringResource(R.plurals.dashboard_n_trackers, t.trackers, t.trackers),
+                    pluralStringResource(R.plurals.dashboard_n_companies, t.companies, t.companies),
+                    period,
+                )
+            },
+            style = Warden.type.title,
+        )
+        t.byCompany.take(TOP_COMPANIES).forEachIndexed { i, (company, categories) ->
+            if (i == 0) HorizontalDivider(color = c.outline)
+            Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(company, Modifier.weight(1f), style = Warden.type.body)
+                Text(categories.joinToString(" · "), style = Warden.type.label, color = c.muted)
+            }
+        }
+    }
+}
+
+private const val TOP_COMPANIES = 5

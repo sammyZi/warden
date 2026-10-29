@@ -51,6 +51,7 @@ object Rules {
     fun init(context: Context) {
         Blocklists.init(context)
         AppRules.init(context)
+        Trackers.init(context)
         if (!started.compareAndSet(false, true)) return
         prefs = context.applicationContext.getSharedPreferences("domain_rules", Context.MODE_PRIVATE)
         _domains.value = prefs.all.mapNotNull { (k, v) -> (v as? String)?.let { k to Verdict.valueOf(it) } }.toMap()

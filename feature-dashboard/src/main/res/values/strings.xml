@@ -24,6 +24,20 @@
     <string name="dashboard_lists_body">Warden only blocks what\'s on a list. Pick one in Settings.</string>
     <string name="dashboard_pdns_title">Private DNS is bypassing Warden</string>
     <string name="dashboard_pdns_body">Your phone sends lookups straight to %1$s, so blocking can\'t see them. Set Private DNS to Automatic or Off in Network settings.</string>
+    <string name="dashboard_trackers">Trackers</string>
+    <string name="dashboard_period_today">today</string>
+    <string name="dashboard_period_week">this week</string>
+    <string name="dashboard_period_month">this month</string>
+    <string name="dashboard_trackers_sentence">Your apps contacted %1$s from %2$s %3$s.</string>
+    <plurals name="dashboard_n_trackers">
+        <item quantity="one">%d tracker</item>
+        <item quantity="other">%d trackers</item>
+    </plurals>
+    <plurals name="dashboard_n_companies">
+        <item quantity="one">%d company</item>
+        <item quantity="other">%d companies</item>
+    </plurals>
+    <string name="dashboard_trackers_none">No known trackers contacted %1$s.</string>
     <string name="dashboard_chatty">Chattiest apps</string>
     <string name="dashboard_chatty_empty">Apps show up here as soon as they connect.</string>
     <string name="dashboard_map_title">Where it went</string>

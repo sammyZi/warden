@@ -74,6 +74,9 @@ object History {
 
     fun appDomains(uid: Int, range: Range): Flow<List<DomainCount>> = dao.appDomains(uid, start(range))
 
+    /** Every distinct domain contacted in [range] (for tracker summaries). */
+    fun domains(range: Range): Flow<List<String>> = dao.domains(start(range))
+
     fun quality(range: Range): Flow<List<AppQuality>> = dao.quality(start(range))
 
     /** Start of [range]: midnight today, or N days back. */

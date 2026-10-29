@@ -111,6 +111,9 @@ interface ConnectionDao {
     )
     fun quality(since: Long): Flow<List<AppQuality>>
 
+    @Query("SELECT DISTINCT domain FROM connections WHERE time >= :since AND domain IS NOT NULL")
+    fun domains(since: Long): Flow<List<String>>
+
     @Query("DELETE FROM connections WHERE time < :before")
     suspend fun deleteBefore(before: Long)
 

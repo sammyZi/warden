@@ -1,0 +1,141 @@
+# Warden tracker map: domain <TAB> company <TAB> category. Written for Warden (GPL-3.0).
+# A domain also covers its subdomains. Categories: Ads, Analytics, Attribution, Crash reporting,
+# Social, Messaging, Fingerprinting. Facts about who operates a domain; contributions welcome.
+doubleclick.net	Google	Ads
+googlesyndication.com	Google	Ads
+googleadservices.com	Google	Ads
+googletagservices.com	Google	Ads
+admob.com	Google	Ads
+adservice.google.com	Google	Ads
+pagead2.googlesyndication.com	Google	Ads
+google-analytics.com	Google	Analytics
+googletagmanager.com	Google	Analytics
+app-measurement.com	Google	Analytics
+firebase-settings.crashlytics.com	Google	Crash reporting
+crashlytics.com	Google	Crash reporting
+firebaselogging-pa.googleapis.com	Google	Analytics
+firebaseinstallations.googleapis.com	Google	Analytics
+firebaseremoteconfig.googleapis.com	Google	Analytics
+an.facebook.com	Meta	Ads
+connect.facebook.net	Meta	Social
+graph.facebook.com	Meta	Social
+graph.instagram.com	Meta	Social
+pixel.facebook.com	Meta	Ads
+amazon-adsystem.com	Amazon	Ads
+aax.amazon-adsystem.com	Amazon	Ads
+device-metrics-us.amazon.com	Amazon	Analytics
+clarity.ms	Microsoft	Analytics
+bat.bing.com	Microsoft	Ads
+in.appcenter.ms	Microsoft	Analytics
+browser.events.data.microsoft.com	Microsoft	Analytics
+unityads.unity3d.com	Unity	Ads
+config.uca.cloud.unity3d.com	Unity	Analytics
+cdp.cloud.unity3d.com	Unity	Analytics
+applovin.com	AppLovin	Ads
+applvn.com	AppLovin	Ads
+supersonicads.com	ironSource	Ads
+ironsrc.com	ironSource	Ads
+ironsrc.mobi	ironSource	Ads
+vungle.com	Liftoff	Ads
+liftoff.io	Liftoff	Ads
+chartboost.com	Chartboost	Ads
+inmobi.com	InMobi	Ads
+inmobicdn.net	InMobi	Ads
+mintegral.com	Mintegral	Ads
+rayjump.com	Mintegral	Ads
+mintegral.net	Mintegral	Ads
+pangle.io	ByteDance	Ads
+pangleglobal.com	ByteDance	Ads
+byteoversea.com	ByteDance	Analytics
+analytics.tiktok.com	ByteDance	Analytics
+ads.tiktok.com	ByteDance	Ads
+tapjoy.com	Tapjoy	Ads
+tapjoyads.com	Tapjoy	Ads
+fyber.com	Digital Turbine	Ads
+inner-active.mobi	Digital Turbine	Ads
+smaato.net	Smaato	Ads
+mopub.com	AppLovin	Ads
+moloco.com	Moloco	Ads
+adcolony.com	Digital Turbine	Ads
+startappservice.com	Start.io	Ads
+start.io	Start.io	Ads
+criteo.com	Criteo	Ads
+criteo.net	Criteo	Ads
+taboola.com	Taboola	Ads
+outbrain.com	Outbrain	Ads
+adnxs.com	Microsoft (Xandr)	Ads
+rubiconproject.com	Magnite	Ads
+pubmatic.com	PubMatic	Ads
+openx.net	OpenX	Ads
+casalemedia.com	Index Exchange	Ads
+yieldmo.com	Yieldmo	Ads
+samsungads.com	Samsung	Ads
+ads.yahoo.com	Yahoo	Ads
+flurry.com	Yahoo	Analytics
+ads-twitter.com	X	Ads
+analytics.twitter.com	X	Analytics
+ads-api.twitter.com	X	Ads
+tr.snapchat.com	Snap	Ads
+sc-static.net	Snap	Ads
+ct.pinterest.com	Pinterest	Ads
+appsflyer.com	AppsFlyer	Attribution
+appsflyersdk.com	AppsFlyer	Attribution
+adjust.com	Adjust	Attribution
+adjust.io	Adjust	Attribution
+adj.st	Adjust	Attribution
+branch.io	Branch	Attribution
+app.link	Branch	Attribution
+kochava.com	Kochava	Attribution
+singular.net	Singular	Attribution
+sng.link	Singular	Attribution
+tenjin.io	Tenjin	Attribution
+airbridge.io	Airbridge	Attribution
+mixpanel.com	Mixpanel	Analytics
+amplitude.com	Amplitude	Analytics
+segment.io	Twilio Segment	Analytics
+segment.com	Twilio Segment	Analytics
+heapanalytics.com	Heap	Analytics
+hotjar.com	Hotjar	Analytics
+hotjar.io	Hotjar	Analytics
+fullstory.com	FullStory	Analytics
+smartlook.com	Smartlook	Analytics
+uxcam.com	UXCam	Analytics
+scorecardresearch.com	Comscore	Analytics
+imrworldwide.com	Nielsen	Analytics
+quantserve.com	Quantcast	Analytics
+quantcount.com	Quantcast	Analytics
+appmetrica.yandex.com	Yandex	Analytics
+mc.yandex.ru	Yandex	Analytics
+statcounter.com	StatCounter	Analytics
+newrelic.com	New Relic	Crash reporting
+nr-data.net	New Relic	Crash reporting
+sentry.io	Sentry	Crash reporting
+bugsnag.com	Bugsnag	Crash reporting
+instabug.com	Instabug	Crash reporting
+browser-intake-datadoghq.com	Datadog	Analytics
+datadoghq.com	Datadog	Analytics
+embrace.io	Embrace	Crash reporting
+braze.com	Braze	Messaging
+appboy.com	Braze	Messaging
+onesignal.com	OneSignal	Messaging
+clevertap-prod.com	CleverTap	Messaging
+wzrkt.com	CleverTap	Messaging
+moengage.com	MoEngage	Messaging
+webengage.com	WebEngage	Messaging
+leanplum.com	Leanplum	Messaging
+urbanairship.com	Airship	Messaging
+batch.com	Batch	Messaging
+iterable.com	Iterable	Messaging
+customer.io	Customer.io	Messaging
+tracking.miui.com	Xiaomi	Analytics
+data.mistat.xiaomi.com	Xiaomi	Analytics
+data.mistat.intl.xiaomi.com	Xiaomi	Analytics
+sdkconfig.ad.xiaomi.com	Xiaomi	Ads
+metrics.data.hicloud.com	Huawei	Analytics
+iadsdk.apple.com	Apple	Ads
+fingerprintjs.com	FingerprintJS	Fingerprinting
+fpjs.io	FingerprintJS	Fingerprinting
+threatmetrix.com	LexisNexis	Fingerprinting
+online-metrix.net	LexisNexis	Fingerprinting
+iovation.com	TransUnion	Fingerprinting
+perimeterx.net	HUMAN	Fingerprinting

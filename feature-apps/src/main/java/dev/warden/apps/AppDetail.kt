@@ -52,6 +52,9 @@ import dev.warden.design.Tile
 import dev.warden.design.WardenSwitch
 import dev.warden.rules.AppRule
 import dev.warden.rules.AppRules
+import dev.warden.rules.TrackerSummary
+import dev.warden.rules.Trackers
+import dev.warden.rules.summarizeTrackers
 import dev.warden.design.ChoiceChips
 import dev.warden.rules.DomainChoice
 import dev.warden.rules.Rules
@@ -155,6 +158,10 @@ internal fun AppDetail(
                 style = Warden.type.body,
                 color = c.muted,
             )
+        }
+        item {
+            val trackers = remember(domains) { summarizeTrackers(domains.map { it.name }) }
+            TrackersSection(trackers, domains)
         }
         item {
             Row(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.l), horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
@@ -368,4 +375,44 @@ internal fun DomainRuleChips(uid: Int, domain: String, modifier: Modifier = Modi
         { Rules.choose(uid, domain, DomainChoice.entries[it]) },
         modifier,
     )
+}
+
+/** "8 trackers from 4 companies", then each company with what it does and which domains. */
+@Composable
+private fun TrackersSection(t: TrackerSummary, domains: List<DomainGroup>) {
+    val c = Warden.colors
+    Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.l), verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+        SectionLabel(stringResource(R.string.apps_trackers))
+        Tile(Modifier.fillMaxWidth()) {
+            Text(
+                if (t.trackers == 0) {
+                    stringResource(R.string.apps_trackers_none)
+                } else {
+                    stringResource(
+                        R.string.apps_trackers_sentence,
+                        pluralStringResource(R.plurals.apps_n_trackers, t.trackers, t.trackers),
+                        pluralStringResource(R.plurals.apps_n_companies, t.companies, t.companies),
+                    )
+                },
+                style = Warden.type.title,
+            )
+            t.byCompany.forEach { (company, categories) ->
+                HorizontalDivider(color = c.outline)
+                val names = domains.map { it.name }.filter { Trackers.lookup(it)?.company == company }
+                Column(Modifier.fillMaxWidth().padding(vertical = Spacing.xs)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(company, Modifier.weight(1f), style = Warden.type.body)
+                        Text(categories.joinToString(" · "), style = Warden.type.label, color = c.muted)
+                    }
+                    Text(
+                        names.joinToString(", "),
+                        style = Warden.type.label,
+                        color = c.muted,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
 }
