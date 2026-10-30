@@ -63,8 +63,8 @@
     <string name="data_all_apps">Apps, most data first</string>
     <string name="data_chart_description">Data moved over time. The busiest period moved %1$s.</string>
     <string name="tool_data_box_system">used by your apps</string>
-    <string name="tool_data_wifi">Wi-Fi  %1$s</string>
-    <string name="tool_data_mobile">Mobile  %1$s</string>
+    <string name="tool_data_wifi">Wi-Fi</string>
+    <string name="tool_data_mobile">Mobile</string>
     <string name="data_total_system">used by your apps %1$s</string>
     <string name="data_source_system">From Android\'s own counters, so it counts even while Warden is off.</string>
     <string name="data_by_network">By network</string>

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -232,7 +233,7 @@ private fun AppRow(
             if (icon != null) Image(icon, null, Modifier.size(36.dp)) else IconBadge(DesignR.drawable.ph_squares_four, hue)
             Column(Modifier.weight(1f)) {
                 Text(appLabel(r.uid), style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                captionLines(r).forEach { Text(it, style = Warden.type.label.tabular(), color = c.muted, maxLines = 1) }
+                UsageCaption(r.usage)
             }
             Text(formatBytes(r.usage.total), style = Warden.type.body.copy(fontWeight = FontWeight.Medium).tabular())
             Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(16.dp), tint = c.muted)
@@ -243,19 +244,27 @@ private fun AppRow(
     }
 }
 
+/**
+ * Wi-Fi and mobile on their own lines (Android's counters), the amounts lined up in one column so they
+ * compare at a glance; or sent / received on one line (Warden's own history).
+ */
 @Composable
-/** Wi-Fi and mobile on their own lines (Android's counters), or sent / received (Warden's own history). */
-private fun captionLines(r: AppLine): List<String> {
-    val u = r.usage
-    return if (u.wifi != null && u.mobile != null) {
-        listOf(
-            stringResource(R.string.tool_data_wifi, formatBytes(u.wifi)),
-            stringResource(R.string.tool_data_mobile, formatBytes(u.mobile)),
-        )
-    } else {
-        listOf(stringResource(R.string.tool_data_caption, formatBytes(u.up), formatBytes(u.down)))
+private fun UsageCaption(u: Usage) {
+    val style = Warden.type.label.tabular()
+    val color = Warden.colors.muted
+    if (u.wifi == null || u.mobile == null) {
+        Text(stringResource(R.string.tool_data_caption, formatBytes(u.up), formatBytes(u.down)), style = style, color = color, maxLines = 1)
+        return
+    }
+    listOf(R.string.tool_data_wifi to u.wifi, R.string.tool_data_mobile to u.mobile).forEach { (label, bytes) ->
+        Row {
+            Text(stringResource(label), Modifier.width(CAPTION_LABEL_WIDTH), style = style, color = color, maxLines = 1)
+            Text(formatBytes(bytes), style = style, color = color, maxLines = 1)
+        }
     }
 }
+
+private val CAPTION_LABEL_WIDTH = 56.dp
 
 /** Every company seen, with what it does and which of its domains were contacted. */
 @Composable
