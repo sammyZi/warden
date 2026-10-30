@@ -199,6 +199,10 @@ private fun Overview(
     val scope = rememberCoroutineScope()
     val total = destinations.sumOf { it.connections }.coerceAtLeast(1)
     val reduceMotion = Warden.reduceMotion
+    // One reveal for the whole screen: arcs, dots and every share ring grow together, once per filter change.
+    // A fresh progress per key, created at 0 in the same frame as the new data, so no frame shows it fully drawn first.
+    val reveal = remember(revealKey) { Animatable(if (reduceMotion) 1f else 0f) }
+    LaunchedEffect(reveal) { reveal.animateTo(1f, Motion.emphasized(REVEAL_MS)) }
 
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
         item {
@@ -212,7 +216,7 @@ private fun Overview(
                 geo = g,
                 home = home,
                 destinations = destinations,
-                revealKey = revealKey,
+                progress = { reveal.value },
                 selected = selected,
                 camera = camera,
                 onSelect = { selected = it },
@@ -259,9 +263,8 @@ private fun Overview(
             }
         }
         itemsIndexed(destinations, key = { _, d -> d.country.iso }) { i, d ->
-            // New countries fade in and the rest slide to their new rank when a filter changes.
-            Box(if (reduceMotion) Modifier else Modifier.animateItem(placementSpec = null, fadeOutSpec = null)) {
-                CountryRow(d, total, first = i == 0, last = i == destinations.lastIndex) {
+            Box {
+                CountryRow(d, total, first = i == 0, last = i == destinations.lastIndex, progress = { reveal.value }) {
                     selected = d.country.iso
                     scope.launch { camera.focus(d.country.lat, d.country.lon) }
                     onOpen(d.country.iso)
@@ -275,7 +278,7 @@ private fun Overview(
 /** A country as a card: code badge in its hue, name and counts, share of all traffic, share bar. */
 /** One row of the countries table. The rows join into a single panel with thin dividers; a ring shows each share. */
 @Composable
-private fun CountryRow(d: Destination, total: Int, first: Boolean, last: Boolean, onClick: () -> Unit) {
+private fun CountryRow(d: Destination, total: Int, first: Boolean, last: Boolean, progress: () -> Float, onClick: () -> Unit) {
     val c = Warden.colors
     val hue = countryHue(d.country.iso, c.palette)
     val r = Radii.medium
@@ -313,26 +316,23 @@ private fun CountryRow(d: Destination, total: Int, first: Boolean, last: Boolean
                     maxLines = 1,
                 )
             }
-            ShareRing(d.connections / total.toFloat(), hue)
+            ShareRing(d.connections / total.toFloat(), hue, progress)
         }
         if (!last) HorizontalDivider(Modifier.background(c.surface), color = c.outline)
     }
 }
 
-/** Share of all connections as a thin ring with the percentage inside. Draws in once. */
+/** Share of all connections as a thin ring with the percentage inside. Fills with the globe's reveal. */
 @Composable
-private fun ShareRing(share: Float, hue: Color) {
+private fun ShareRing(share: Float, hue: Color, progress: () -> Float) {
     val c = Warden.colors
-    val reduceMotion = Warden.reduceMotion
-    val sweep = remember { Animatable(if (reduceMotion) share else 0f) }
-    LaunchedEffect(share) { if (reduceMotion) sweep.snapTo(share) else sweep.animateTo(share, Motion.emphasized(Motion.COUNT_UP)) }
     Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val stroke = 4.dp.toPx()
             val inset = stroke / 2
             val arc = Size(size.width - stroke, size.height - stroke)
             drawArc(c.surfaceVariant, 0f, 360f, false, Offset(inset, inset), arc, style = Stroke(stroke))
-            drawArc(hue, -90f, 360f * sweep.value, false, Offset(inset, inset), arc, style = Stroke(stroke, cap = StrokeCap.Round))
+            drawArc(hue, -90f, 360f * share * progress(), false, Offset(inset, inset), arc, style = Stroke(stroke, cap = StrokeCap.Round))
         }
         Text("${(share * 100).roundToInt()}%", style = Warden.type.label.tabular())
     }

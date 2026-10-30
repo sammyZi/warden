@@ -78,7 +78,8 @@ internal fun Globe(
     onSelect: (String?) -> Unit,
     description: String,
     modifier: Modifier = Modifier,
-    revealKey: Any = Unit,
+    /** Shared reveal progress (0..1) from the screen; when null the globe reveals itself once. */
+    progress: (() -> Float)? = null,
 ) {
     val c = Warden.colors
     val reduceMotion = Warden.reduceMotion
@@ -87,12 +88,8 @@ internal fun Globe(
     val currentDestinations by rememberUpdatedState(destinations)
 
     val reveal = remember { Animatable(if (reduceMotion) 1f else 0f) }
-    // Arcs grow out from home and dots swell in, again whenever the filters behind them change.
-    LaunchedEffect(revealKey) {
-        if (reduceMotion) return@LaunchedEffect
-        reveal.snapTo(0f)
-        reveal.animateTo(1f, Motion.emphasized(REVEAL_MS))
-    }
+    // Arcs grow out from home and dots swell in.
+    if (progress == null) LaunchedEffect(Unit) { reveal.animateTo(1f, Motion.emphasized(REVEAL_MS)) }
 
     // Slow idle spin; frames only run while this screen is on screen.
     if (!reduceMotion) {
@@ -159,11 +156,12 @@ internal fun Globe(
         drawCircle(c.outline, r, center, style = Stroke(1.dp.toPx()))
         drawLand(geo.land, rot, center, r, front, limb, dotPaint, c.muted)
 
+        val shown = progress?.invoke() ?: reveal.value
         val arc = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round)
         for (d in destinations) {
             if (homeVec == null || d.country.iso == home?.iso) continue
             val to = FloatArray(3).also { Geo.unit(d.country.lat, d.country.lon, it, 0) }
-            if (buildArc(path, homeVec, to, rot, center, r, reveal.value)) {
+            if (buildArc(path, homeVec, to, rot, center, r, shown)) {
                 val color = countryHue(d.country.iso, c.palette)
                 drawPath(path, color.copy(alpha = if (selected == null || selected == d.country.iso) 0.85f else 0.25f), style = arc)
             }
@@ -175,7 +173,7 @@ internal fun Globe(
             rot.apply(v[0], v[1], v[2])
             if (rot.z <= 0f) continue
             val p = Offset(center.x + r * rot.x, center.y - r * rot.y)
-            val dot = (3.dp + 7.dp * sqrt(d.connections / maxCount.toFloat())).toPx() * reveal.value
+            val dot = (3.dp + 7.dp * sqrt(d.connections / maxCount.toFloat())).toPx() * shown
             drawCircle(countryHue(d.country.iso, c.palette), dot, p)
             if (d.blocked > 0) drawCircle(c.blocked, dot + 3.dp.toPx(), p, style = Stroke(1.5.dp.toPx()))
             if (d.country.iso == selected) drawCircle(c.text, dot + 7.dp.toPx(), p, style = Stroke(2.dp.toPx()))
@@ -288,4 +286,4 @@ private const val ARC_STEPS = 32
 private const val IDLE_MS = 3000
 private const val SPIN_DEG_PER_S = 4f
 private const val FOCUS_MS = 600
-private const val REVEAL_MS = 900
+internal const val REVEAL_MS = 900
