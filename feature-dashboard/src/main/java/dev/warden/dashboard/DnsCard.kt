@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -49,21 +50,21 @@ internal fun DnsCard(onOpenSettings: () -> Unit) {
     val config by Dns.config.collectAsState()
     var picking by rememberSaveable { mutableStateOf(false) }
     val encrypted = config.dohUrl != null
-    val hue = if (encrypted) c.accentInk else c.warning
+    val hue = upstreamHue(config.upstream, encrypted)
     val shape = RoundedCornerShape(Radii.medium)
 
     Row(
         Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(c.surface)
-            .border(1.dp, c.outline, shape)
+            // Tinted like the Tools boxes, in the provider's own colour; amber while lookups aren't encrypted.
+            .background(hue.copy(alpha = if (c.isDark) 0.22f else 0.13f))
             .clickable(role = Role.Button) { picking = true }
             .padding(horizontal = Spacing.l, vertical = Spacing.m),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
-        Box(Modifier.size(40.dp).background(hue.copy(alpha = 0.16f), CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(40.dp).background(hue.copy(alpha = 0.22f), CircleShape), contentAlignment = Alignment.Center) {
             Icon(
                 painterResource(if (encrypted) DesignR.drawable.ph_lock_key_light else DesignR.drawable.ph_lock_simple),
                 null,
@@ -79,7 +80,7 @@ internal fun DnsCard(onOpenSettings: () -> Unit) {
             Text(
                 stringResource(if (encrypted) R.string.dns_card_private else R.string.dns_card_visible),
                 style = Warden.type.label,
-                color = if (encrypted) c.muted else c.warning,
+                color = hue,
             )
         }
         Icon(
@@ -182,3 +183,15 @@ private fun upstreamName(u: Upstream) = stringResource(
         Upstream.Custom -> R.string.dns_name_custom
     },
 )
+
+/** One colour per provider, so the card reads at a glance; the phone's own DNS is amber (not private). */
+@Composable
+private fun upstreamHue(u: Upstream, encrypted: Boolean): Color {
+    val c = Warden.colors
+    if (!encrypted) return c.warning
+    return when (u) {
+        Upstream.Cloudflare -> c.palette[2]
+        Upstream.Quad9 -> c.palette[3]
+        else -> c.palette[4]
+    }
+}
