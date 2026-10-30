@@ -15,14 +15,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,7 +42,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.warden.data.AppTotals
 import dev.warden.data.History
@@ -60,6 +56,13 @@ import dev.warden.design.Warden
 import dev.warden.design.WardenButton
 import dev.warden.design.formatBytes
 import dev.warden.design.tabular
+import androidx.annotation.DrawableRes
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import dev.warden.design.Radii
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 import dev.warden.design.R as DesignR
 
@@ -125,25 +128,12 @@ internal fun UsageAccessCard(onAllow: () -> Unit) {
     }
 }
 
-/** Colours for the two directions and the two networks, used by the overview and by each app's bar. */
-@Composable
-internal fun sentColor(): Color = Warden.colors.palette[4]
-
-@Composable
-internal fun receivedColor(): Color = Warden.colors.accentInk
-
-@Composable
-private fun wifiColor(): Color = Warden.colors.palette[0]
-
-@Composable
-private fun mobileColor(): Color = Warden.colors.palette[2]
-
 /**
- * Top of the Data screen: the total as the hero, sent vs received, Wi-Fi vs mobile (Android's counters
- * only), traffic over time as columns, and the biggest apps as one stacked bar with a legend.
+ * Top of the Data screen, in reading order: how much in total, Wi-Fi vs mobile (Android's counters only),
+ * when it happened with the busiest moment spelled out, then the apps list below takes over.
  */
 @Composable
-internal fun DataOverview(apps: List<Usage>, range: Range, appLabel: (Int) -> String, system: Boolean) {
+internal fun DataOverview(apps: List<Usage>, range: Range, system: Boolean) {
     val c = Warden.colors
     val context = LocalContext.current
     val up = apps.sumOf { it.up }
@@ -155,42 +145,57 @@ internal fun DataOverview(apps: List<Usage>, range: Range, appLabel: (Int) -> St
     }
     val traffic = if (system) systemTraffic else ownTraffic
 
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
-        Column {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xl)) {
+        // 1. The answer.
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(formatBytes(total), style = Warden.type.display.tabular())
             Text(
                 stringResource(if (system) R.string.data_total_system else R.string.data_total, stringResource(period(range))),
                 style = Warden.type.body,
                 color = c.muted,
             )
-            if (system) Text(stringResource(R.string.data_source_system), style = Warden.type.label, color = c.muted)
+            Text(
+                stringResource(R.string.data_up_down, formatBytes(up), formatBytes(down)),
+                style = Warden.type.label.tabular(),
+                color = c.muted,
+            )
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
-            TwoBar(up, down, sentColor(), receivedColor(), Modifier.fillMaxWidth().height(12.dp))
-            Row {
-                Legend(sentColor(), stringResource(R.string.data_sent), formatBytes(up), Modifier.weight(1f))
-                Legend(receivedColor(), stringResource(R.string.data_received), formatBytes(down), Modifier.weight(1f))
-            }
-        }
-
+        // 2. Which network it went over.
         if (system) {
             val wifi = apps.sumOf { it.wifi ?: 0 }
             val mobile = apps.sumOf { it.mobile ?: 0 }
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                SectionLabel(stringResource(R.string.data_by_network))
-                TwoBar(wifi, mobile, wifiColor(), mobileColor(), Modifier.fillMaxWidth().height(12.dp))
-                Row {
-                    Legend(wifiColor(), stringResource(R.string.data_wifi), formatBytes(wifi), Modifier.weight(1f))
-                    Legend(mobileColor(), stringResource(R.string.data_mobile), formatBytes(mobile), Modifier.weight(1f))
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                NetworkCard(
+                    DesignR.drawable.ph_wifi_high,
+                    c.palette[0],
+                    stringResource(R.string.data_wifi),
+                    wifi,
+                    total,
+                    Modifier.weight(1f),
+                )
+                NetworkCard(
+                    DesignR.drawable.ph_cell_signal_full,
+                    c.palette[2],
+                    stringResource(R.string.data_mobile),
+                    mobile,
+                    total,
+                    Modifier.weight(1f),
+                )
             }
         }
 
+        // 3. When, with the busiest slot named so the chart needs no reading.
         if (traffic.any { it > 0 }) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 SectionLabel(stringResource(R.string.data_over_time))
-                Columns(traffic, receivedColor(), Modifier.fillMaxWidth().height(120.dp))
+                val peak = traffic.indices.maxBy { traffic[it] }
+                val step = (System.currentTimeMillis() - History.start(range)) / range.buckets + 1
+                Text(
+                    stringResource(R.string.data_busiest, slotLabel(range, History.start(range) + peak * step), formatBytes(traffic[peak])),
+                    style = Warden.type.body,
+                )
+                Columns(traffic, c.accentInk, Modifier.fillMaxWidth().height(120.dp), highlight = peak)
                 Row {
                     Text(stringResource(startLabel(range)), Modifier.weight(1f), style = Warden.type.caption, color = c.muted)
                     Text(stringResource(R.string.dashboard_activity_end), style = Warden.type.caption, color = c.muted)
@@ -198,78 +203,51 @@ internal fun DataOverview(apps: List<Usage>, range: Range, appLabel: (Int) -> St
             }
         }
 
-        val top = apps.filter { it.total > 0 }.sortedByDescending { it.total }
-        if (top.isNotEmpty() && total > 0) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                SectionLabel(stringResource(R.string.data_by_app))
-                val shown = top.take(TOP_SHARE)
-                val rest = total - shown.sumOf { it.total }
-                val parts = shown.mapIndexed { i, a -> c.palette[i % c.palette.size] to a.total } +
-                    listOfNotNull((c.outline to rest).takeIf { rest > 0 })
-                StackedBar(parts, Modifier.fillMaxWidth().height(20.dp))
-                shown.forEachIndexed { i, a ->
-                    ShareRow(c.palette[i % c.palette.size], appLabel(a.uid), a.total, total)
-                }
-                if (rest > 0) ShareRow(c.outline, stringResource(R.string.data_other), rest, total)
-            }
-        }
-        SectionLabel(stringResource(R.string.data_all_apps))
-    }
-}
-
-/** Sent then received, as one bar. */
-@Composable
-internal fun SplitBar(up: Long, down: Long, modifier: Modifier) = TwoBar(up, down, sentColor(), receivedColor(), modifier)
-
-@Composable
-private fun TwoBar(a: Long, b: Long, colorA: Color, colorB: Color, modifier: Modifier) {
-    val sum = (a + b).coerceAtLeast(1)
-    Row(modifier.clip(RoundedCornerShape(Spacing.xs)).background(Warden.colors.surfaceVariant)) {
-        if (a > 0) Box(Modifier.weight(a.toFloat() / sum).fillMaxHeight().background(colorA))
-        if (b > 0) Box(Modifier.weight(b.toFloat() / sum).fillMaxHeight().background(colorB))
-    }
-}
-
-@Composable
-private fun StackedBar(parts: List<Pair<Color, Long>>, modifier: Modifier) {
-    val sum = parts.sumOf { it.second }.coerceAtLeast(1)
-    Row(modifier.clip(RoundedCornerShape(Spacing.s)), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        parts.filter { it.second > 0 }.forEach { (color, bytes) ->
-            Box(Modifier.weight(bytes.toFloat() / sum).fillMaxHeight().background(color))
-        }
-    }
-}
-
-@Composable
-private fun Legend(color: Color, label: String, value: String, modifier: Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-        Box(Modifier.size(10.dp).background(color, CircleShape))
         Column {
-            Text(value, style = Warden.type.title.tabular())
-            Text(label.uppercase(), style = Warden.type.caption, color = Warden.colors.muted)
+            SectionLabel(stringResource(R.string.data_all_apps))
+            if (system) Text(stringResource(R.string.data_source_system), style = Warden.type.label, color = c.muted)
         }
     }
 }
 
+/** Wi-Fi or mobile: the amount, and its share of the total. */
 @Composable
-private fun ShareRow(color: Color, label: String, bytes: Long, total: Long) {
+private fun NetworkCard(@DrawableRes icon: Int, hue: Color, label: String, bytes: Long, total: Long, modifier: Modifier) {
     val c = Warden.colors
-    Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).background(color, CircleShape))
-        Spacer(Modifier.size(Spacing.s))
-        Text(label, Modifier.weight(1f), style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(formatBytes(bytes), style = Warden.type.label.tabular(), color = c.muted)
-        Text(
-            "${(bytes * 100f / total).roundToInt()}%",
-            Modifier.padding(start = Spacing.m).size(width = 40.dp, height = 20.dp),
-            style = Warden.type.label.tabular(),
-        )
+    Column(
+        modifier
+            .clip(RoundedCornerShape(Radii.medium))
+            .background(hue.copy(alpha = if (c.isDark) 0.22f else 0.13f))
+            .padding(Spacing.m),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+            Icon(painterResource(icon), null, Modifier.size(18.dp), tint = hue)
+            Text(label.uppercase(), style = Warden.type.caption, color = c.muted, maxLines = 1)
+        }
+        Text(formatBytes(bytes), style = Warden.type.headline.tabular(), maxLines = 1)
+        val share = if (total > 0) bytes.toFloat() / total else 0f
+        Box(Modifier.fillMaxWidth().height(4.dp).background(c.surfaceVariant, RoundedCornerShape(2.dp))) {
+            Box(Modifier.fillMaxWidth(share).fillMaxHeight().background(hue, RoundedCornerShape(2.dp)))
+        }
+        Text(stringResource(R.string.data_share, (share * 100).roundToInt()), style = Warden.type.label.tabular(), color = c.muted)
     }
+}
+
+/** "2 PM" today, "Tue 6 PM" over a week, "Oct 28" over a month. */
+private fun slotLabel(range: Range, time: Long): String {
+    val skeleton = when (range) {
+        Range.Today -> "ha"
+        Range.Week -> "EEEha"
+        Range.Month -> "MMMd"
+    }
+    val pattern = android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), skeleton)
+    return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(time))
 }
 
 /** Bytes per bucket as rounded columns, drawn in left to right. The busiest column is full height. */
 @Composable
-private fun Columns(values: List<Long>, color: Color, modifier: Modifier) {
+private fun Columns(values: List<Long>, color: Color, modifier: Modifier, highlight: Int = -1) {
     val c = Warden.colors
     val reduceMotion = Warden.reduceMotion
     val reveal = remember { Animatable(if (reduceMotion) 1f else 0f) }
@@ -286,7 +264,8 @@ private fun Columns(values: List<Long>, color: Color, modifier: Modifier) {
             val local = ((reveal.value * values.size) - i).coerceIn(0f, 1f)
             drawRoundRect(c.surfaceVariant, Offset(x, 0f), Size(w, size.height), r)
             val h = size.height * (v.toFloat() / peak) * local
-            if (h > 0) drawRoundRect(color, Offset(x, size.height - h), Size(w, h), r)
+            val fill = if (highlight < 0 || i == highlight) color else color.copy(alpha = 0.45f)
+            if (h > 0) drawRoundRect(fill, Offset(x, size.height - h), Size(w, h), r)
         }
     }
 }
@@ -303,5 +282,4 @@ private fun startLabel(range: Range) = when (range) {
     Range.Month -> R.string.dashboard_activity_month_ago
 }
 
-private const val TOP_SHARE = 5
 private const val CHART_MS = 900

@@ -93,4 +93,13 @@
     <string name="report_line_screen_off">%1$d%% happened with the screen off</string>
     <string name="report_line_score">Score, grade %1$s</string>
     <string name="report_bands">A 90 and up · B 80 · C 65 · D 50 · F below 50. Covers the last 7 days and only what Warden can see on this phone.</string>
+    <string name="apps_section_overview">Overview</string>
+    <string name="apps_section_data">Data used</string>
+    <string name="apps_range_today">Today</string>
+    <string name="apps_range_week">7 days</string>
+    <string name="apps_range_month">30 days</string>
+    <string name="apps_data_networks">Last 30 days: Wi-Fi %1$s · Mobile %2$s</string>
+    <string name="apps_data_warden_only">Counted only while Warden was on. Allow Usage access on the Data screen to count it all the time.</string>
+    <string name="apps_domains_title">Domains · %1$d</string>
+    <string name="apps_domains_hint">Tap one to see its connections or block it.</string>
 </resources>

@@ -50,16 +50,6 @@ data class AppTotals(
 
 data class DomainCount(val domain: String, val count: Int, val blocked: Int)
 
-data class AppQuality(
-    val uid: Int,
-    val dnsMs: Double?,
-    val rttMs: Double?,
-    val lookups: Int,
-    val failedLookups: Int,
-    val connections: Int,
-    val failedConnections: Int,
-)
-
 @Dao
 interface ConnectionDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -108,16 +98,6 @@ interface ConnectionDao {
            WHERE uid = :uid AND time >= :since AND domain IS NOT NULL GROUP BY domain ORDER BY count DESC""",
     )
     fun appDomains(uid: Int, since: Long): Flow<List<DomainCount>>
-
-    @Query(
-        """SELECT uid,
-           AVG(CASE WHEN kind = 'dns' THEN latencyMs END) AS dnsMs,
-           AVG(CASE WHEN kind != 'dns' THEN latencyMs END) AS rttMs,
-           SUM(kind = 'dns') AS lookups, SUM(kind = 'dns' AND failed AND NOT blocked) AS failedLookups,
-           SUM(kind != 'dns') AS connections, SUM(kind != 'dns' AND failed AND NOT blocked) AS failedConnections
-           FROM connections WHERE time >= :since GROUP BY uid""",
-    )
-    fun quality(since: Long): Flow<List<AppQuality>>
 
     @Query("SELECT DISTINCT domain FROM connections WHERE time >= :since AND domain IS NOT NULL")
     fun domains(since: Long): Flow<List<String>>

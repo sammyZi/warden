@@ -101,8 +101,6 @@ object History {
     /** Every distinct domain contacted in [range] (for tracker summaries). */
     fun domains(range: Range): Flow<List<String>> = dao.domains(start(range))
 
-    fun quality(range: Range): Flow<List<AppQuality>> = dao.quality(start(range))
-
     /** Start of [range]: midnight today, or N days back. */
     fun start(range: Range): Long = when (range) {
         Range.Today -> Calendar.getInstance().apply {

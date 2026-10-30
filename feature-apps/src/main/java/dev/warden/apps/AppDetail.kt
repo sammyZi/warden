@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -136,65 +136,69 @@ internal fun AppDetail(
                     }
                 }
             }
-            ReportRow(report.grade.letter, Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.l)) { showReport = true }
+            ReportRow(report.grade.letter, Modifier.padding(horizontal = Spacing.xl)) { showReport = true }
             if (showReport) ReportCardSheet(report, name, appIcon(uid)) { showReport = false }
         }
-        // Three numbers, no boxes.
+        // Each part of the page is its own labelled card, with room between them.
         item {
-            Row(Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.l)) {
-                Number(connections, stringResource(R.string.apps_sq_connections), c.text, Modifier.weight(1f))
-                Number(domains.size, stringResource(R.string.apps_sq_domains), c.text, Modifier.weight(1f))
-                Number(blocked, stringResource(R.string.apps_sq_blocked), if (blocked > 0) c.blocked else c.text, Modifier.weight(1f))
-            }
-        }
-        item {
-            Column(
-                Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(Spacing.s),
-            ) {
-                SectionLabel(stringResource(R.string.apps_activity))
-                val activity = remember(mine) { mine.activity() }
-                if (activity.any { it > 0 }) {
-                    Sparkline(activity, c.accentInk, Modifier.fillMaxWidth().height(56.dp))
-                } else {
-                    Text(stringResource(R.string.apps_activity_none), style = Warden.type.body, color = c.muted)
+            Section(stringResource(R.string.apps_section_overview)) {
+                Tile(Modifier.fillMaxWidth()) {
+                    Row {
+                        Number(connections, stringResource(R.string.apps_sq_connections), c.text, Modifier.weight(1f))
+                        Number(domains.size, stringResource(R.string.apps_sq_domains), c.text, Modifier.weight(1f))
+                        val blockedInk = if (blocked > 0) c.blocked else c.text
+                        Number(blocked, stringResource(R.string.apps_sq_blocked), blockedInk, Modifier.weight(1f))
+                    }
+                    HorizontalDivider(color = c.outline)
+                    Text(stringResource(R.string.apps_activity).uppercase(), style = Warden.type.caption, color = c.muted)
+                    val activity = remember(mine) { mine.activity() }
+                    if (activity.any { it > 0 }) {
+                        Sparkline(activity, c.accentInk, Modifier.fillMaxWidth().height(56.dp))
+                    } else {
+                        Text(stringResource(R.string.apps_activity_none), style = Warden.type.body, color = c.muted)
+                    }
                 }
             }
         }
-        item {
-            SectionLabel(stringResource(R.string.apps_access_label), Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.s))
-            AccessCard(uid, name)
-        }
+        item { Section(stringResource(R.string.apps_section_data)) { DataUsedCard(uid) } }
+        item { Section(stringResource(R.string.apps_access_label)) { AccessCard(uid, name) } }
         item {
             val trackers = remember(domains) { summarizeTrackers(domains.map { it.name }) }
-            TrackersSection(trackers)
+            Section(stringResource(R.string.apps_trackers)) { TrackersCard(trackers) }
         }
         item {
-            SectionLabel(
-                stringResource(R.string.apps_domains_label),
-                Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.xl, bottom = Spacing.s),
-            )
+            Section(stringResource(R.string.apps_domains_title, domains.size)) {
+                Text(stringResource(R.string.apps_domains_hint), style = Warden.type.label, color = c.muted)
+            }
         }
         val most = domains.maxOfOrNull { it.events.size } ?: 1
-        items(domains, key = { it.name }) { d -> DomainRow(uid, d, most, time) }
+        itemsIndexed(domains, key = { _, d -> d.name }) { i, d ->
+            DomainRow(uid, d, most, time, first = i == 0, last = i == domains.lastIndex)
+        }
         item { BarSpacer() }
     }
 }
 
 /** A domain with its share bar; tap to expand its recent connections in place. */
 @Composable
-private fun DomainRow(uid: Int, d: DomainGroup, most: Int, time: DateFormat) {
+private fun DomainRow(uid: Int, d: DomainGroup, most: Int, time: DateFormat, first: Boolean, last: Boolean) {
     val c = Warden.colors
     var open by rememberSaveable(d.name) { mutableStateOf(false) }
     val turn by animateFloatAsState(if (open) 90f else 0f, Motion.emphasized(Motion.MEDIUM), label = "caret")
     val stateText = stringResource(if (open) R.string.apps_expanded else R.string.apps_collapsed)
+    val r = Radii.medium
+    val shape =
+        RoundedCornerShape(if (first) r else 0.dp, if (first) r else 0.dp, if (last) r else 0.dp, if (last) r else 0.dp)
     Column(
         Modifier
+            .padding(horizontal = Spacing.xl)
             .fillMaxWidth()
+            .clip(shape)
+            .background(c.surface)
             .animateContentSize(Motion.emphasized(Motion.LONG))
             .clickable(role = Role.Button) { open = !open }
             .semantics { stateDescription = stateText }
-            .padding(horizontal = Spacing.xl, vertical = Spacing.m),
+            .padding(horizontal = Spacing.l, vertical = Spacing.m),
         verticalArrangement = Arrangement.spacedBy(Spacing.s),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
@@ -214,6 +218,8 @@ private fun DomainRow(uid: Int, d: DomainGroup, most: Int, time: DateFormat) {
                     ).joinToString(" · "),
                     style = Warden.type.label.tabular(),
                     color = c.muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (d.blocked > 0) BlockedTag(d.blocked)
@@ -245,7 +251,7 @@ private fun DomainRow(uid: Int, d: DomainGroup, most: Int, time: DateFormat) {
                     ).joinToString("  ·  "),
                     Modifier
                         .fillMaxWidth()
-                        .background(c.surface, RoundedCornerShape(Spacing.s))
+                        .background(c.surfaceVariant, RoundedCornerShape(Spacing.s))
                         .padding(horizontal = Spacing.m, vertical = Spacing.s),
                     style = Warden.type.caption.tabular(),
                     color = if (e.blocked) c.blocked else c.muted,
@@ -258,7 +264,7 @@ private fun DomainRow(uid: Int, d: DomainGroup, most: Int, time: DateFormat) {
             }
         }
     }
-    HorizontalDivider(Modifier.padding(horizontal = Spacing.xl), color = c.outline)
+    if (!last) HorizontalDivider(Modifier.padding(horizontal = Spacing.xl).background(c.surface), color = c.outline)
 }
 
 private const val MAX_EXPANDED = 10
@@ -269,7 +275,7 @@ private fun AccessCard(uid: Int, name: String) {
     val c = Warden.colors
     val rules by AppRules.rules.collectAsState()
     val rule = rules[uid] ?: AppRule()
-    Tile(Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.xl).fillMaxWidth()) {
+    Tile(Modifier.fillMaxWidth()) {
         AccessRow(
             DesignR.drawable.ph_wifi_high,
             stringResource(R.string.apps_wifi),
@@ -355,10 +361,9 @@ internal fun DomainRuleChips(uid: Int, domain: String, modifier: Modifier = Modi
 
 /** "8 trackers from 4 companies", then one line per company with what it does. */
 @Composable
-private fun TrackersSection(t: TrackerSummary) {
+private fun TrackersCard(t: TrackerSummary) {
     val c = Warden.colors
-    Column(Modifier.padding(horizontal = Spacing.xl), verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
-        SectionLabel(stringResource(R.string.apps_trackers))
+    Tile(Modifier.fillMaxWidth()) {
         Text(
             if (t.trackers == 0) {
                 stringResource(R.string.apps_trackers_none)
@@ -373,11 +378,24 @@ private fun TrackersSection(t: TrackerSummary) {
             color = if (t.trackers == 0) c.muted else c.text,
         )
         t.byCompany.forEach { (company, categories) ->
+            HorizontalDivider(color = c.outline)
             Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(company, Modifier.weight(1f), style = Warden.type.body)
                 Text(categories.joinToString(" · "), style = Warden.type.label, color = c.muted)
             }
         }
+    }
+}
+
+/** A labelled block of the page with space above it. */
+@Composable
+private fun Section(title: String, content: @Composable () -> Unit) {
+    Column(
+        Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.xl, bottom = Spacing.s),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s),
+    ) {
+        SectionLabel(title)
+        content()
     }
 }
 
