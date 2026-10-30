@@ -12,6 +12,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -38,7 +42,15 @@ object History {
         scope.launch {
             var sincePrune = Long.MAX_VALUE / 2
             while (true) {
-                delay(FLUSH_MS)
+                // Screen off: nobody is watching, so write in bigger, rarer batches (fewer disk wakeups).
+                delay(
+                    when {
+                        !Engine.running.value -> FLUSH_IDLE_MS // protection off: nothing new to write
+                        power.isInteractive -> FLUSH_MS
+                        else -> FLUSH_SCREEN_OFF_MS
+                    },
+                )
+                // ponytail: screen state is taken at write time, so a batch spanning a screen change is labelled by its end.
                 val screenOn = power.isInteractive
                 val new = Engine.drainNew().map { it.toRow(screenOn) }
                 val closed = Engine.drainClosed()
@@ -53,8 +65,23 @@ object History {
         }
     }
 
+    private val visible = MutableStateFlow(false)
+
+    /** Warden's UI came to the front or left it. Screen queries only run while it's showing. */
+    fun setVisible(showing: Boolean) {
+        visible.value = showing
+    }
+
+    /**
+     * Room re-runs every observed query after each write. Left running in the background, that was most
+     * of Warden's CPU (measured: ~70% on the Room threads), so UI queries pause while no screen shows.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun <T> Flow<T>.whileVisible(): Flow<T> = visible.flatMapLatest { if (it) this else emptyFlow() }
+
     /** Most recent events, newest first: what the live screens (apps, map, log) show. */
-    fun recent(limit: Int = RECENT_ROWS): Flow<List<NetEvent>> = dao.recent(limit).map { rows -> rows.map { it.toEvent() } }
+    fun recent(limit: Int = RECENT_ROWS): Flow<List<NetEvent>> =
+        dao.recent(limit).whileVisible().map { rows -> rows.map { it.toEvent() } }
 
     /** When this process started: the "this session" range. */
     val sessionStart = System.currentTimeMillis()
@@ -67,15 +94,15 @@ object History {
 
     /** Connections (no DNS answers) since [since], newest first, capped at [limit]. */
     fun connectionsSince(since: Long, limit: Int = MAP_ROWS): Flow<List<NetEvent>> =
-        dao.connectionsSince(since, limit).map { rows -> rows.map { it.toEvent() } }
+        dao.connectionsSince(since, limit).whileVisible().map { rows -> rows.map { it.toEvent() } }
 
-    fun stats(range: Range): Flow<RangeStats> = dao.stats(start(range))
+    fun stats(range: Range): Flow<RangeStats> = dao.stats(start(range)).whileVisible()
 
     /** Event counts per bucket across [range], oldest first, zero-filled. */
     fun activity(range: Range): Flow<List<Int>> {
         val since = start(range)
         val bucketMs = (System.currentTimeMillis() - since) / range.buckets + 1
-        return dao.activity(since, bucketMs).map { list ->
+        return dao.activity(since, bucketMs).whileVisible().map { list ->
             val out = IntArray(range.buckets)
             list.forEach { if (it.bucket in 0 until range.buckets) out[it.bucket.toInt()] = it.count }
             out.toList()
@@ -86,7 +113,7 @@ object History {
     fun traffic(range: Range): Flow<List<Long>> {
         val since = start(range)
         val bucketMs = (System.currentTimeMillis() - since) / range.buckets + 1
-        return dao.traffic(since, bucketMs).map { list ->
+        return dao.traffic(since, bucketMs).whileVisible().map { list ->
             val out = LongArray(range.buckets)
             list.forEach { if (it.bucket in 0 until range.buckets) out[it.bucket.toInt()] = it.bytes }
             out.toList()
@@ -94,12 +121,12 @@ object History {
     }
 
     fun apps(range: Range, screenOffOnly: Boolean = false, limit: Int = 50): Flow<List<AppTotals>> =
-        dao.apps(start(range), screenOffOnly, limit)
+        dao.apps(start(range), screenOffOnly, limit).whileVisible()
 
-    fun appDomains(uid: Int, range: Range): Flow<List<DomainCount>> = dao.appDomains(uid, start(range))
+    fun appDomains(uid: Int, range: Range): Flow<List<DomainCount>> = dao.appDomains(uid, start(range)).whileVisible()
 
     /** Every distinct domain contacted in [range] (for tracker summaries). */
-    fun domains(range: Range): Flow<List<String>> = dao.domains(start(range))
+    fun domains(range: Range): Flow<List<String>> = dao.domains(start(range)).whileVisible()
 
     /** Start of [range]: midnight today, or N days back. */
     fun start(range: Range): Long = when (range) {
@@ -124,6 +151,8 @@ object History {
     )
 
     private const val FLUSH_MS = 1_500L
+    private const val FLUSH_SCREEN_OFF_MS = 30_000L
+    private const val FLUSH_IDLE_MS = 10_000L
     private const val PRUNE_EVERY_MS = 3_600_000L
     private const val KEEP_DAYS = 30L
     private const val WEEK_DAYS = 7L

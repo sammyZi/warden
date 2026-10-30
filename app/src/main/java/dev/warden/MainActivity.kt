@@ -24,9 +24,21 @@ import dev.warden.design.Motion
 import dev.warden.design.ThemeMode
 import dev.warden.design.Warden
 import dev.warden.design.WardenTheme
+import dev.warden.data.History
 import dev.warden.rules.Rules
 
 class MainActivity : ComponentActivity() {
+
+    // History's screen queries run only while Warden is on screen (see History.setVisible).
+    override fun onStart() {
+        super.onStart()
+        History.setVisible(true)
+    }
+
+    override fun onStop() {
+        History.setVisible(false)
+        super.onStop()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

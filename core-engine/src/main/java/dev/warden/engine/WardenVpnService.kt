@@ -14,6 +14,7 @@ import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Build
 import android.os.Handler
+import android.os.PowerManager
 import android.os.Process
 import android.util.Log
 import com.celzero.firestack.backend.Backend
@@ -35,8 +36,7 @@ import dev.warden.rules.Rules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -163,7 +163,6 @@ class WardenVpnService : VpnService(), Bridge {
         useEncryptedDns()
         cm.registerDefaultNetworkCallback(networkCallback)
         Engine.setRunning(true)
-        // Keep the notification's blocked count current; events already arrive in 500ms batches.
         resets = CoroutineScope(Dispatchers.Default).launch {
             Rules.resets.collect { uids ->
                 runCatching { tunnel?.closeConns(uids) }.onFailure { Log.w(TAG, "closeConns($uids)", it) }
@@ -172,9 +171,19 @@ class WardenVpnService : VpnService(), Bridge {
         restarts = CoroutineScope(Dispatchers.Default).launch {
             Rules.restarts.collect { mainHandler.post { reconnect() } }
         }
+        // The notification's blocked count: redrawn at most every 10s, and not at all while the screen is
+        // off (nobody sees it then; each redraw costs System UI work).
+        Engine.blocked.set(0)
         counter = CoroutineScope(Dispatchers.Default).launch {
-            Engine.events.map { list -> list.count { it.blocked } }.distinctUntilChanged().collect { blocked ->
-                getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(blocked))
+            val power = getSystemService(PowerManager::class.java)
+            var shown = 0
+            while (true) {
+                delay(NOTIFY_EVERY_MS)
+                val now = Engine.blocked.get()
+                if (now != shown && power.isInteractive) {
+                    shown = now
+                    getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(now))
+                }
             }
         }
     }
@@ -415,6 +424,7 @@ class WardenVpnService : VpnService(), Bridge {
         private const val NOTIFICATION_ID = 1
         private const val MTU = 1500
         private const val MS_PER_S = 1000
+        private const val NOTIFY_EVERY_MS = 10_000L
         private const val UNKNOWN_UID = -1
 
         // Private ranges, same shape as Rethink's defaults: .1 is us, .3 is the fake DNS server.

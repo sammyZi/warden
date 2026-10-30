@@ -1,11 +1,6 @@
 package dev.warden.engine
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,25 +41,10 @@ object Engine {
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
 
-    private val _events = MutableStateFlow<List<NetEvent>>(emptyList())
-    val events: StateFlow<List<NetEvent>> = _events.asStateFlow()
-
     internal fun setRunning(on: Boolean) = _running.update { on }
 
-    // Events land here from firestack's threads at any rate; the UI sees a snapshot at most every
-    // PUBLISH_MS. Publishing per event recomposed every screen dozens of times a second (jank).
-    // ponytail: in-memory ring of 300; Room with 1-2s batch inserts lands in M4.
-    private val buffer = ArrayDeque<NetEvent>()
-    private val kick = Channel<Unit>(Channel.CONFLATED)
-
-    init {
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            for (@Suppress("UnusedPrivateProperty") signal in kick) {
-                delay(PUBLISH_MS)
-                _events.value = synchronized(buffer) { buffer.toList() }
-            }
-        }
-    }
+    /** Blocked flows and lookups since the tunnel started, for the notification. */
+    internal val blocked = AtomicInteger()
 
     // Persistence queues, drained in batches by the history writer (bounded if nobody drains).
     private val pendingNew = ArrayList<NetEvent>()
@@ -78,31 +58,18 @@ object Engine {
 
     /** Forget everything in memory (the user cleared history). */
     fun clear() {
-        synchronized(buffer) { buffer.clear() }
         synchronized(pendingNew) { pendingNew.clear() }
         synchronized(pendingClosed) { pendingClosed.clear() }
-        kick.trySend(Unit)
     }
 
     internal fun record(e: NetEvent) {
-        synchronized(buffer) {
-            buffer.addFirst(e)
-            if (buffer.size > MAX_EVENTS) buffer.removeLast()
-        }
+        if (e.blocked) blocked.incrementAndGet()
         synchronized(pendingNew) { if (pendingNew.size < MAX_PENDING) pendingNew.add(e) }
-        kick.trySend(Unit)
     }
 
     internal fun closed(c: Closed) {
-        synchronized(buffer) {
-            val i = buffer.indexOfFirst { it.id == c.id }
-            if (i >= 0) buffer[i] = buffer[i].copy(bytesUp = c.up, bytesDown = c.down, latencyMs = c.rttMs, failed = c.failed)
-        }
         synchronized(pendingClosed) { if (pendingClosed.size < MAX_PENDING) pendingClosed.add(c) }
-        kick.trySend(Unit)
     }
 
-    private const val MAX_EVENTS = 300
     private const val MAX_PENDING = 20_000
-    private const val PUBLISH_MS = 500L
 }
