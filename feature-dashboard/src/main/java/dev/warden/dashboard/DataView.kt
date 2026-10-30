@@ -1,5 +1,13 @@
 package dev.warden.dashboard
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -21,7 +29,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,53 +40,150 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.warden.data.AppTotals
 import dev.warden.data.History
 import dev.warden.data.Range
+import dev.warden.data.SystemUsage
+import dev.warden.design.IconBadge
 import dev.warden.design.Motion
 import dev.warden.design.SectionLabel
 import dev.warden.design.Spacing
+import dev.warden.design.Tile
 import dev.warden.design.Warden
+import dev.warden.design.WardenButton
 import dev.warden.design.formatBytes
 import dev.warden.design.tabular
 import kotlin.math.roundToInt
+import dev.warden.design.R as DesignR
 
-/** Colours for the two directions, used by the overview and by each app's bar. */
+/** One app's data for the Data screen. Wi-Fi and mobile are known only from Android's counters. */
+internal class Usage(val uid: Int, val up: Long, val down: Long, val wifi: Long? = null, val mobile: Long? = null) {
+    val total get() = up + down
+}
+
+internal fun List<AppTotals>.asUsage() = map { Usage(it.uid, it.bytesUp, it.bytesDown) }
+
+/** Whether Warden may read Android's data counters, and a way to ask. Re-checked when settings returns. */
+@Composable
+internal fun rememberUsageAccess(): Pair<Boolean, () -> Unit> {
+    val context = LocalContext.current
+    var access by remember { mutableStateOf(SystemUsage.hasAccess(context)) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        access = SystemUsage.hasAccess(context)
+    }
+    return access to {
+        // Straight to Warden's switch where the phone supports it, else the full list.
+        try {
+            launcher.launch(usageAccessIntent(context, direct = true))
+        } catch (_: ActivityNotFoundException) {
+            launcher.launch(usageAccessIntent(context, direct = false))
+        }
+    }
+}
+
+private fun usageAccessIntent(context: Context, direct: Boolean) = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+    if (direct && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) data = Uri.parse("package:${context.packageName}")
+}
+
+/** Per-app usage from Android's counters for [range], or null while loading / without access. */
+@Composable
+internal fun systemApps(range: Range, access: Boolean): List<Usage>? {
+    val context = LocalContext.current
+    val apps by produceState<List<Usage>?>(null, range, access) {
+        value = if (!access) {
+            null
+        } else {
+            SystemUsage.apps(context, History.start(range), System.currentTimeMillis())
+                .map { Usage(it.uid, it.up, it.down, it.wifi, it.mobile) }
+        }
+    }
+    return apps
+}
+
+/** Shown on the Data screen until Usage access is on. */
+@Composable
+internal fun UsageAccessCard(onAllow: () -> Unit) {
+    val c = Warden.colors
+    Tile(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+            IconBadge(DesignR.drawable.ph_cell_signal_full, c.palette[0])
+            Text(
+                stringResource(R.string.usage_access_title),
+                Modifier.weight(1f),
+                style = Warden.type.body.copy(fontWeight = FontWeight.Medium),
+            )
+        }
+        Text(stringResource(R.string.usage_access_body), style = Warden.type.label, color = c.muted)
+        WardenButton(stringResource(R.string.usage_access_button), onAllow, Modifier.fillMaxWidth())
+    }
+}
+
+/** Colours for the two directions and the two networks, used by the overview and by each app's bar. */
 @Composable
 internal fun sentColor(): Color = Warden.colors.palette[4]
 
 @Composable
 internal fun receivedColor(): Color = Warden.colors.accentInk
 
+@Composable
+private fun wifiColor(): Color = Warden.colors.palette[0]
+
+@Composable
+private fun mobileColor(): Color = Warden.colors.palette[2]
+
 /**
- * Top of the Data screen: the total as the hero, sent vs received, traffic over time as columns,
- * and the biggest apps as one stacked bar with a legend.
+ * Top of the Data screen: the total as the hero, sent vs received, Wi-Fi vs mobile (Android's counters
+ * only), traffic over time as columns, and the biggest apps as one stacked bar with a legend.
  */
 @Composable
-internal fun DataOverview(apps: List<AppTotals>, range: Range, appLabel: (Int) -> String) {
+internal fun DataOverview(apps: List<Usage>, range: Range, appLabel: (Int) -> String, system: Boolean) {
     val c = Warden.colors
-    val up = apps.sumOf { it.bytesUp }
-    val down = apps.sumOf { it.bytesDown }
+    val context = LocalContext.current
+    val up = apps.sumOf { it.up }
+    val down = apps.sumOf { it.down }
     val total = up + down
-    val traffic by remember(range) { History.traffic(range) }.collectAsState(emptyList())
+    val ownTraffic by remember(range) { History.traffic(range) }.collectAsState(emptyList())
+    val systemTraffic by produceState(emptyList<Long>(), range, system) {
+        if (system) value = SystemUsage.traffic(context, History.start(range), range.buckets)
+    }
+    val traffic = if (system) systemTraffic else ownTraffic
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
         Column {
             Text(formatBytes(total), style = Warden.type.display.tabular())
-            Text(stringResource(R.string.data_total, stringResource(period(range))), style = Warden.type.body, color = c.muted)
+            Text(
+                stringResource(if (system) R.string.data_total_system else R.string.data_total, stringResource(period(range))),
+                style = Warden.type.body,
+                color = c.muted,
+            )
+            if (system) Text(stringResource(R.string.data_source_system), style = Warden.type.label, color = c.muted)
         }
 
-        // Sent vs received, one bar split in two.
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
-            SplitBar(up, down, Modifier.fillMaxWidth().height(12.dp))
+            TwoBar(up, down, sentColor(), receivedColor(), Modifier.fillMaxWidth().height(12.dp))
             Row {
                 Legend(sentColor(), stringResource(R.string.data_sent), formatBytes(up), Modifier.weight(1f))
                 Legend(receivedColor(), stringResource(R.string.data_received), formatBytes(down), Modifier.weight(1f))
+            }
+        }
+
+        if (system) {
+            val wifi = apps.sumOf { it.wifi ?: 0 }
+            val mobile = apps.sumOf { it.mobile ?: 0 }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                SectionLabel(stringResource(R.string.data_by_network))
+                TwoBar(wifi, mobile, wifiColor(), mobileColor(), Modifier.fillMaxWidth().height(12.dp))
+                Row {
+                    Legend(wifiColor(), stringResource(R.string.data_wifi), formatBytes(wifi), Modifier.weight(1f))
+                    Legend(mobileColor(), stringResource(R.string.data_mobile), formatBytes(mobile), Modifier.weight(1f))
+                }
             }
         }
 
@@ -90,17 +198,17 @@ internal fun DataOverview(apps: List<AppTotals>, range: Range, appLabel: (Int) -
             }
         }
 
-        val top = apps.filter { it.bytesUp + it.bytesDown > 0 }.sortedByDescending { it.bytesUp + it.bytesDown }
+        val top = apps.filter { it.total > 0 }.sortedByDescending { it.total }
         if (top.isNotEmpty() && total > 0) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 SectionLabel(stringResource(R.string.data_by_app))
                 val shown = top.take(TOP_SHARE)
-                val rest = total - shown.sumOf { it.bytesUp + it.bytesDown }
-                val parts = shown.mapIndexed { i, a -> c.palette[i % c.palette.size] to (a.bytesUp + a.bytesDown) } +
+                val rest = total - shown.sumOf { it.total }
+                val parts = shown.mapIndexed { i, a -> c.palette[i % c.palette.size] to a.total } +
                     listOfNotNull((c.outline to rest).takeIf { rest > 0 })
                 StackedBar(parts, Modifier.fillMaxWidth().height(20.dp))
                 shown.forEachIndexed { i, a ->
-                    ShareRow(c.palette[i % c.palette.size], appLabel(a.uid), a.bytesUp + a.bytesDown, total)
+                    ShareRow(c.palette[i % c.palette.size], appLabel(a.uid), a.total, total)
                 }
                 if (rest > 0) ShareRow(c.outline, stringResource(R.string.data_other), rest, total)
             }
@@ -109,12 +217,16 @@ internal fun DataOverview(apps: List<AppTotals>, range: Range, appLabel: (Int) -
     }
 }
 
+/** Sent then received, as one bar. */
 @Composable
-internal fun SplitBar(up: Long, down: Long, modifier: Modifier) {
-    val sum = (up + down).coerceAtLeast(1)
+internal fun SplitBar(up: Long, down: Long, modifier: Modifier) = TwoBar(up, down, sentColor(), receivedColor(), modifier)
+
+@Composable
+private fun TwoBar(a: Long, b: Long, colorA: Color, colorB: Color, modifier: Modifier) {
+    val sum = (a + b).coerceAtLeast(1)
     Row(modifier.clip(RoundedCornerShape(Spacing.xs)).background(Warden.colors.surfaceVariant)) {
-        if (up > 0) Box(Modifier.weight(up.toFloat() / sum).fillMaxHeight().background(sentColor()))
-        if (down > 0) Box(Modifier.weight(down.toFloat() / sum).fillMaxHeight().background(receivedColor()))
+        if (a > 0) Box(Modifier.weight(a.toFloat() / sum).fillMaxHeight().background(colorA))
+        if (b > 0) Box(Modifier.weight(b.toFloat() / sum).fillMaxHeight().background(colorB))
     }
 }
 

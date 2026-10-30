@@ -92,12 +92,14 @@ private fun toolData(range: Range): ToolData {
 internal fun ToolsGrid(range: Range, onOpen: (Tool) -> Unit) {
     val d = toolData(range)
     val trackers = remember(d.domains) { summarizeTrackers(d.domains) }
+    val (access, _) = rememberUsageAccess()
+    val dataTotal = (systemApps(range, access) ?: d.all.asUsage()).sumOf { it.total }
     val values = mapOf(
         Tool.Trackers to (
             trackers.trackers.toString() to
                 pluralStringResource(R.plurals.dashboard_n_companies, trackers.companies, trackers.companies)
             ),
-        Tool.Data to (formatBytes(d.all.sumOf { it.bytesUp + it.bytesDown }) to stringResource(R.string.tool_data_box)),
+        Tool.Data to (formatBytes(dataTotal) to stringResource(if (access) R.string.tool_data_box_system else R.string.tool_data_box)),
         Tool.ScreenOff to (d.off.sumOf { it.connections + it.blocked }.toString() to stringResource(R.string.tool_screen_off_box)),
         Tool.Quality to (avgDns(d.quality)?.let { stringResource(R.string.tool_ms, it) }.orEmpty().ifEmpty { "–" } to
             stringResource(R.string.tool_quality_box)),
@@ -160,7 +162,11 @@ internal fun ToolScreen(
     val c = Warden.colors
     var range by rememberSaveable { mutableStateOf(initialRange) }
     val d = toolData(range)
-    val rows = remember(tool, d) { rows(tool, d) }
+    // Data comes from Android's counters when Usage access is on (works with Warden off), else Warden's own history.
+    val (access, requestAccess) = rememberUsageAccess()
+    val system = systemApps(range, access)
+    val usage = if (access) system.orEmpty() else d.all.asUsage()
+    val rows = remember(tool, d, usage) { rows(tool, d, usage) }
     val most = rows.maxOfOrNull { it.value }?.coerceAtLeast(1f) ?: 1f
 
     LazyColumn(
@@ -199,7 +205,8 @@ internal fun ToolScreen(
                 Modifier.padding(vertical = Spacing.s),
             )
         }
-        if (tool == Tool.Data && rows.isNotEmpty()) item { DataOverview(d.all, range, appLabel) }
+        if (tool == Tool.Data && !access) item { UsageAccessCard(requestAccess) }
+        if (tool == Tool.Data && rows.isNotEmpty()) item { DataOverview(usage, range, appLabel, system = access) }
         if (tool == Tool.Trackers) {
             item { TrackerCompanies(d.domains, range) }
         } else if (rows.isEmpty()) {
@@ -213,11 +220,18 @@ internal fun ToolScreen(
     }
 }
 
-private class AppLine(val uid: Int, val value: Float, val totals: AppTotals?, val quality: AppQuality?, val tool: Tool)
+private class AppLine(
+    val uid: Int,
+    val value: Float,
+    val totals: AppTotals?,
+    val quality: AppQuality?,
+    val tool: Tool,
+    val usage: Usage? = null,
+)
 
-private fun rows(tool: Tool, d: ToolData): List<AppLine> = when (tool) {
+private fun rows(tool: Tool, d: ToolData, usage: List<Usage>): List<AppLine> = when (tool) {
     Tool.Trackers -> emptyList()
-    Tool.Data -> d.all.map { AppLine(it.uid, (it.bytesUp + it.bytesDown).toFloat(), it, null, tool) }.filter { it.value > 0 }
+    Tool.Data -> usage.map { AppLine(it.uid, it.total.toFloat(), null, null, tool, it) }.filter { it.value > 0 }
     Tool.ScreenOff -> d.off.map { AppLine(it.uid, (it.connections + it.blocked).toFloat(), it, null, tool) }
     // Worst first: failure rate, then slow lookups. Apps with too few events to judge are left out.
     Tool.Quality -> d.quality.filter { it.lookups + it.connections >= MIN_EVENTS }.map {
@@ -238,10 +252,10 @@ private fun AppRow(r: AppLine, appLabel: (Int) -> String, appIcon: (Int) -> Imag
             }
             Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(16.dp), tint = c.muted)
         }
-        if (r.tool == Tool.Data && r.totals != null) {
+        if (r.tool == Tool.Data && r.usage != null) {
             // Same split as the overview: sent then received, the whole bar scaled to the biggest app.
             Box(Modifier.fillMaxWidth().height(6.dp).background(c.surfaceVariant, RoundedCornerShape(3.dp))) {
-                SplitBar(r.totals.bytesUp, r.totals.bytesDown, Modifier.fillMaxWidth(share.coerceIn(0f, 1f)).fillMaxHeight())
+                SplitBar(r.usage.up, r.usage.down, Modifier.fillMaxWidth(share.coerceIn(0f, 1f)).fillMaxHeight())
             }
         } else if (r.tool != Tool.Quality) {
             Box(Modifier.fillMaxWidth().height(4.dp).background(c.surfaceVariant, RoundedCornerShape(2.dp))) {
@@ -253,10 +267,12 @@ private fun AppRow(r: AppLine, appLabel: (Int) -> String, appIcon: (Int) -> Imag
 
 @Composable
 private fun caption(r: AppLine): String {
-    val t = r.totals
+    val u = r.usage
     val q = r.quality
     return when {
-        r.tool == Tool.Data && t != null -> stringResource(R.string.tool_data_caption, formatBytes(t.bytesUp), formatBytes(t.bytesDown))
+        u?.wifi != null && u.mobile != null ->
+            stringResource(R.string.tool_data_caption_networks, formatBytes(u.wifi), formatBytes(u.mobile))
+        u != null -> stringResource(R.string.tool_data_caption, formatBytes(u.up), formatBytes(u.down))
         r.tool == Tool.ScreenOff -> pluralStringResource(R.plurals.tool_screen_off_caption, r.value.toInt(), r.value.toInt())
         q != null -> stringResource(R.string.tool_quality_caption, (q.dnsMs ?: 0.0).roundToInt(), (failedShare(q) * 100).roundToInt())
         else -> ""

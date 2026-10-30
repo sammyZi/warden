@@ -56,7 +56,7 @@
     <string name="tool_quality_box">average lookup</string>
     <string name="tool_ms">%1$d ms</string>
     <string name="tool_trackers_about">Known tracking companies your apps reached, and the domains they used.</string>
-    <string name="tool_data_about">How much each app sent and received through Warden.</string>
+    <string name="tool_data_about">How much data each app used, sent and received.</string>
     <string name="tool_screen_off_about">Apps that kept connecting while your screen was off.</string>
     <string name="tool_quality_about">Lookup speed and failures per app, worst first. Slow or failing apps may have a network problem, or may be blocked.</string>
     <string name="tool_empty">Nothing here for this period yet.</string>
@@ -74,4 +74,14 @@
     <string name="data_other">Everything else</string>
     <string name="data_all_apps">All apps</string>
     <string name="data_chart_description">Data moved over time. The busiest period moved %1$s.</string>
+    <string name="tool_data_box_system">used by your apps</string>
+    <string name="tool_data_caption_networks">Wi-Fi %1$s  ·  Mobile %2$s</string>
+    <string name="data_total_system">used by your apps %1$s</string>
+    <string name="data_source_system">From Android\'s own counters, so it counts even while Warden is off.</string>
+    <string name="data_by_network">By network</string>
+    <string name="data_wifi">Wi-Fi</string>
+    <string name="data_mobile">Mobile data</string>
+    <string name="usage_access_title">Count data even when Warden is off</string>
+    <string name="usage_access_body">Allow Usage access and Warden reads Android\'s own per-app data counters, split by Wi-Fi and mobile. They stay on this phone.</string>
+    <string name="usage_access_button">Allow usage access</string>
 </resources>
