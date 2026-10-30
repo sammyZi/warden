@@ -45,7 +45,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -73,6 +72,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.runtime.LaunchedEffect
 import dev.warden.design.IconBadge
 import dev.warden.design.Motion
 import dev.warden.design.SectionLabel
@@ -84,6 +90,7 @@ import dev.warden.design.tabular
 import dev.warden.engine.NetEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
@@ -109,7 +116,7 @@ fun MapScreen(
     var blockedOnly by remember { mutableStateOf(false) }
     var trackersOnly by remember { mutableStateOf(false) }
     // Tagged with the scope they were loaded for, so the reveal below restarts only once new rows arrive.
-    val loaded by remember(scope) { History.connectionsSince(scope.since()).map { scope to it } }
+    val loaded by remember(scope) { History.connectionsSince(scope.since()).distinctUntilChanged().map { scope to it } }
         .collectAsState(scope to emptyList())
     val events = loaded.second
     val topApps = remember(events) {
@@ -119,7 +126,7 @@ fun MapScreen(
     // Paired with the filters that produced it: when that changes, the globe and list animate in again.
     val result by produceState(Any() to emptyList<Destination>(), events, g, appFilter, blockedOnly, trackersOnly) {
         val filters = listOf(loaded.first, appFilter, blockedOnly, trackersOnly)
-        value = filters to withContext(Dispatchers.Default) {
+        val next = withContext(Dispatchers.Default) {
             val shown = events.filter { e ->
                 (appFilter.isEmpty() || e.uid in appFilter) &&
                     (!blockedOnly || e.blocked) &&
@@ -127,6 +134,8 @@ fun MapScreen(
             }
             aggregate(shown, g, homeCountry(context)?.let(g::country))
         }
+        // Room can emit the same rows twice right after a switch; publishing that again replayed the animations.
+        if (filters != value.first || next.signature() != value.second.signature()) value = filters to next
     }
     val destinations = result.second
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
@@ -249,11 +258,10 @@ private fun Overview(
                 }
             }
         }
-        val most = destinations.maxOfOrNull { it.connections } ?: 1
         itemsIndexed(destinations, key = { _, d -> d.country.iso }) { i, d ->
             // New countries fade in and the rest slide to their new rank when a filter changes.
-            Box(if (reduceMotion) Modifier else Modifier.animateItem()) {
-                CountryRow(d, total, most, first = i == 0, last = i == destinations.lastIndex) {
+            Box(if (reduceMotion) Modifier else Modifier.animateItem(placementSpec = null, fadeOutSpec = null)) {
+                CountryRow(d, total, first = i == 0, last = i == destinations.lastIndex) {
                     selected = d.country.iso
                     scope.launch { camera.focus(d.country.lat, d.country.lon) }
                     onOpen(d.country.iso)
@@ -265,25 +273,20 @@ private fun Overview(
 }
 
 /** A country as a card: code badge in its hue, name and counts, share of all traffic, share bar. */
-/**
- * One row of the countries table. The rows join into a single panel with thin dividers; each row's
- * background fills from the left by its share of the busiest country, so the list reads as a bar chart.
- */
+/** One row of the countries table. The rows join into a single panel with thin dividers; a ring shows each share. */
 @Composable
-private fun CountryRow(d: Destination, total: Int, most: Int, first: Boolean, last: Boolean, onClick: () -> Unit) {
+private fun CountryRow(d: Destination, total: Int, first: Boolean, last: Boolean, onClick: () -> Unit) {
     val c = Warden.colors
     val hue = countryHue(d.country.iso, c.palette)
     val r = Radii.medium
     val shape =
         RoundedCornerShape(if (first) r else 0.dp, if (first) r else 0.dp, if (last) r else 0.dp, if (last) r else 0.dp)
-    val fill = d.connections / most.coerceAtLeast(1).toFloat()
     Column(Modifier.padding(horizontal = Spacing.l)) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .clip(shape)
                 .background(c.surface)
-                .drawBehind { drawRect(hue.copy(alpha = SHARE_ALPHA), size = size.copy(width = size.width * fill)) }
                 .clickable(onClick = onClick)
                 .heightIn(min = 64.dp)
                 .padding(horizontal = Spacing.l, vertical = Spacing.m),
@@ -292,12 +295,16 @@ private fun CountryRow(d: Destination, total: Int, most: Int, first: Boolean, la
         ) {
             CountryMark(d.country.iso, hue)
             Column(Modifier.weight(1f)) {
-                Text(
-                    countryName(d.country.iso),
-                    style = Warden.type.body.copy(fontWeight = FontWeight.Medium),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                    Text(
+                        countryName(d.country.iso),
+                        Modifier.weight(1f, fill = false),
+                        style = Warden.type.body.copy(fontWeight = FontWeight.Medium),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (d.blocked > 0) BlockedTag(d.blocked)
+                }
                 Text(
                     pluralStringResource(R.plurals.map_connections, d.connections, d.connections) + " · " +
                         pluralStringResource(R.plurals.map_n_apps, d.apps, d.apps),
@@ -306,12 +313,28 @@ private fun CountryRow(d: Destination, total: Int, most: Int, first: Boolean, la
                     maxLines = 1,
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("${(d.connections * 100f / total).roundToInt()}%", style = Warden.type.title.tabular())
-                if (d.blocked > 0) BlockedTag(d.blocked)
-            }
+            ShareRing(d.connections / total.toFloat(), hue)
         }
         if (!last) HorizontalDivider(Modifier.background(c.surface), color = c.outline)
+    }
+}
+
+/** Share of all connections as a thin ring with the percentage inside. Draws in once. */
+@Composable
+private fun ShareRing(share: Float, hue: Color) {
+    val c = Warden.colors
+    val reduceMotion = Warden.reduceMotion
+    val sweep = remember { Animatable(if (reduceMotion) share else 0f) }
+    LaunchedEffect(share) { if (reduceMotion) sweep.snapTo(share) else sweep.animateTo(share, Motion.emphasized(Motion.COUNT_UP)) }
+    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 4.dp.toPx()
+            val inset = stroke / 2
+            val arc = Size(size.width - stroke, size.height - stroke)
+            drawArc(c.surfaceVariant, 0f, 360f, false, Offset(inset, inset), arc, style = Stroke(stroke))
+            drawArc(hue, -90f, 360f * sweep.value, false, Offset(inset, inset), arc, style = Stroke(stroke, cap = StrokeCap.Round))
+        }
+        Text("${(share * 100).roundToInt()}%", style = Warden.type.label.tabular())
     }
 }
 
@@ -335,7 +358,6 @@ internal fun flagOf(iso: String): String? {
 }
 
 private const val REGIONAL_A = 0x1F1E6
-private const val SHARE_ALPHA = 0.12f
 
 /** Everything that went to one country: totals, the apps that went there, every connection. */
 @Composable
@@ -750,3 +772,6 @@ private fun scopeLabel(s: Scope): String = stringResource(
         Scope.Month -> R.string.map_scope_month
     },
 )
+
+/** What the screen shows for a set of destinations: country and count, in order. */
+private fun List<Destination>.signature() = map { it.country.iso to it.connections }
