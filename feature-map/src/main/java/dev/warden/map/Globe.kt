@@ -78,6 +78,7 @@ internal fun Globe(
     onSelect: (String?) -> Unit,
     description: String,
     modifier: Modifier = Modifier,
+    revealKey: Any = Unit,
 ) {
     val c = Warden.colors
     val reduceMotion = Warden.reduceMotion
@@ -86,7 +87,12 @@ internal fun Globe(
     val currentDestinations by rememberUpdatedState(destinations)
 
     val reveal = remember { Animatable(if (reduceMotion) 1f else 0f) }
-    LaunchedEffect(Unit) { reveal.animateTo(1f, Motion.emphasized(REVEAL_MS)) }
+    // Arcs grow out from home and dots swell in, again whenever the filters behind them change.
+    LaunchedEffect(revealKey) {
+        if (reduceMotion) return@LaunchedEffect
+        reveal.snapTo(0f)
+        reveal.animateTo(1f, Motion.emphasized(REVEAL_MS))
+    }
 
     // Slow idle spin; frames only run while this screen is on screen.
     if (!reduceMotion) {

@@ -3,6 +3,7 @@ package dev.warden.apps
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,9 +41,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.warden.design.Motion
+import dev.warden.design.Radii
 import dev.warden.design.SectionLabel
 import dev.warden.design.BarSpacer
 import dev.warden.design.Spacing
@@ -133,16 +135,8 @@ internal fun AppDetail(
                         SectionLabel(stringResource(R.string.apps_last_seen, time.format(Date(mine.maxOf { it.time }))))
                     }
                 }
-                val badge = stringResource(R.string.report_badge, report.grade.letter)
-                GradeBadge(
-                    report.grade.letter,
-                    48.dp,
-                    Modifier
-                        .clip(CircleShape)
-                        .clickable(role = Role.Button) { showReport = true }
-                        .semantics { contentDescription = badge },
-                )
             }
+            ReportRow(report.grade.letter, Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.l)) { showReport = true }
             if (showReport) ReportCardSheet(report, name, appIcon(uid)) { showReport = false }
         }
         // Three numbers, no boxes.
@@ -384,6 +378,31 @@ private fun TrackersSection(t: TrackerSummary) {
                 Text(categories.joinToString(" · "), style = Warden.type.label, color = c.muted)
             }
         }
+    }
+}
+
+/** The grade with words beside it, so it reads as something to tap: "Privacy grade B · See the report card". */
+@Composable
+private fun ReportRow(letter: String, modifier: Modifier, onClick: () -> Unit) {
+    val c = Warden.colors
+    val shape = RoundedCornerShape(Radii.medium)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(c.surface)
+            .border(1.dp, c.outline, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(Spacing.m),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.m),
+    ) {
+        GradeBadge(letter, 40.dp)
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.report_row_title, letter), style = Warden.type.body.copy(fontWeight = FontWeight.Medium))
+            Text(stringResource(R.string.report_row_body), style = Warden.type.label, color = c.muted)
+        }
+        Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(16.dp), tint = c.muted)
     }
 }
 

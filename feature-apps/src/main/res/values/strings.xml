@@ -82,7 +82,8 @@
     <string name="report_footer">Score %1$d / 100 · checked on-device by Warden</string>
     <string name="report_share_text">%1$s\'s privacy report from Warden</string>
     <string name="apps_access_label">Network access</string>
-    <string name="report_badge">Privacy grade %1$s. Opens the report card.</string>
+    <string name="report_row_title">Privacy grade %1$s</string>
+    <string name="report_row_body">See the report card and how it was scored</string>
     <string name="report_start">Every app starts at</string>
     <plurals name="report_line_companies">
         <item quantity="one">%d tracker company (9 each, up to 6)</item>

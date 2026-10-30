@@ -29,16 +29,32 @@ import kotlinx.coroutines.delay
 import java.text.NumberFormat
 import kotlin.math.roundToInt
 
-/** Compact byte count for metadata lines: 812B, 4.1K, 1.2M. */
-fun formatBytes(n: Long): String = when {
-    n >= 1_048_576 -> "%.1fM".format(n / 1_048_576f)
-    n >= 1024 -> "%.1fK".format(n / 1024f)
-    else -> "${n}B"
+/** Byte count with a real unit: 812 B, 4.1 KB, 340 MB, 1.7 GB, 2.3 TB (1024 steps). */
+fun formatBytes(n: Long): String {
+    var v = n.toDouble()
+    var unit = 0
+    while (v >= 1024 && unit < BYTE_UNITS.lastIndex) {
+        v /= 1024
+        unit++
+    }
+    return if (unit == 0) "$n B" else "${short(v)} ${BYTE_UNITS[unit]}"
 }
+
+/** Counts that fit a small tile: 950, 1.1K, 12K, 3.4M. */
+fun formatCount(n: Int): String = when {
+    n >= 1_000_000 -> short(n / 1_000_000.0) + "M"
+    n >= 1_000 -> short(n / 1_000.0) + "K"
+    else -> n.toString()
+}
+
+/** One decimal below 10 (dropping ".0"), whole numbers above. */
+private fun short(v: Double): String = if (v < 10) "%.1f".format(v).removeSuffix(".0").removeSuffix(",0") else "%.0f".format(v)
+
+private val BYTE_UNITS = listOf("B", "KB", "MB", "GB", "TB")
 
 /** A number that counts up from 0 on first show (~600ms), then animates to each new value. */
 @Composable
-fun CountUpText(value: Int, style: TextStyle, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
+fun CountUpText(value: Int, style: TextStyle, modifier: Modifier = Modifier, color: Color = Color.Unspecified, compact: Boolean = false) {
     val reduceMotion = Warden.reduceMotion
     val anim = remember { Animatable(if (reduceMotion) value.toFloat() else 0f) }
     LaunchedEffect(value) {
@@ -46,12 +62,15 @@ fun CountUpText(value: Int, style: TextStyle, modifier: Modifier = Modifier, col
     }
     val format = remember { NumberFormat.getIntegerInstance() }
     val final = format.format(value)
+    val shown = anim.value.roundToInt()
     Text(
-        format.format(anim.value.roundToInt()),
+        if (compact) formatCount(shown) else format.format(shown),
         // Screen readers get the final number, not every intermediate frame.
         modifier.clearAndSetSemantics { text = AnnotatedString(final) },
         style = style.tabular(),
         color = color,
+        maxLines = 1,
+        softWrap = false,
     )
 }
 

@@ -141,7 +141,7 @@ fun StatSquare(@DrawableRes icon: Int, hue: Color, value: Int, label: String, mo
     ) {
         Icon(painterResource(icon), null, Modifier.size(18.dp), tint = hue)
         Column {
-            CountUpText(value, Warden.type.headline)
+            CountUpText(value, Warden.type.headline, compact = true)
             Text(
                 label.uppercase(),
                 style = Warden.type.caption.copy(fontSize = 9.sp, letterSpacing = 0.3.sp),

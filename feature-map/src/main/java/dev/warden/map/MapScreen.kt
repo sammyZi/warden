@@ -83,6 +83,7 @@ import dev.warden.design.tabular
 import dev.warden.engine.NetEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
@@ -106,13 +107,18 @@ fun MapScreen(
     var appFilter by remember { mutableStateOf(emptySet<Int>()) }
     var blockedOnly by remember { mutableStateOf(false) }
     var trackersOnly by remember { mutableStateOf(false) }
-    val events by remember(scope) { History.connectionsSince(scope.since()) }.collectAsState(emptyList())
+    // Tagged with the scope they were loaded for, so the reveal below restarts only once new rows arrive.
+    val loaded by remember(scope) { History.connectionsSince(scope.since()).map { scope to it } }
+        .collectAsState(scope to emptyList())
+    val events = loaded.second
     val topApps = remember(events) {
         events.groupingBy { it.uid }.eachCount().entries.sortedByDescending { it.value }.map { it.key to it.value }
     }
     // Up to 5,000 rows of geo lookups: grouped off the main thread.
-    val destinations by produceState(emptyList<Destination>(), events, g, appFilter, blockedOnly, trackersOnly) {
-        value = withContext(Dispatchers.Default) {
+    // Paired with the filters that produced it: when that changes, the globe and list animate in again.
+    val result by produceState(Any() to emptyList<Destination>(), events, g, appFilter, blockedOnly, trackersOnly) {
+        val filters = listOf(loaded.first, appFilter, blockedOnly, trackersOnly)
+        value = filters to withContext(Dispatchers.Default) {
             val shown = events.filter { e ->
                 (appFilter.isEmpty() || e.uid in appFilter) &&
                     (!blockedOnly || e.blocked) &&
@@ -121,6 +127,7 @@ fun MapScreen(
             aggregate(shown, g, homeCountry(context)?.let(g::country))
         }
     }
+    val destinations = result.second
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     // Lives outside the detail transition so coming back from a country keeps the scroll position.
     val listState = rememberLazyListState()
@@ -147,7 +154,7 @@ fun MapScreen(
         val d = destinations.firstOrNull { it.country.iso == iso }
         if (iso == null || d == null) {
             Overview(
-                g, destinations, listState, onOpen = { detail = it },
+                g, destinations, result.first, listState, onOpen = { detail = it },
                 filter = {
                     Row(
                         Modifier.padding(horizontal = Spacing.xl),
@@ -169,6 +176,7 @@ fun MapScreen(
 private fun Overview(
     g: Geo,
     destinations: List<Destination>,
+    revealKey: Any,
     listState: LazyListState,
     onOpen: (String) -> Unit,
     filter: @Composable () -> Unit,
@@ -180,6 +188,7 @@ private fun Overview(
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val total = destinations.sumOf { it.connections }.coerceAtLeast(1)
+    val reduceMotion = Warden.reduceMotion
 
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
         item {
@@ -193,6 +202,7 @@ private fun Overview(
                 geo = g,
                 home = home,
                 destinations = destinations,
+                revealKey = revealKey,
                 selected = selected,
                 camera = camera,
                 onSelect = { selected = it },
@@ -239,10 +249,13 @@ private fun Overview(
             }
         }
         items(destinations, key = { it.country.iso }) { d ->
-            CountryRow(d, total) {
-                selected = d.country.iso
-                scope.launch { camera.focus(d.country.lat, d.country.lon) }
-                onOpen(d.country.iso)
+            // New countries fade in and the rest slide to their new rank when a filter changes.
+            Box(if (reduceMotion) Modifier else Modifier.animateItem()) {
+                CountryRow(d, total) {
+                    selected = d.country.iso
+                    scope.launch { camera.focus(d.country.lat, d.country.lon) }
+                    onOpen(d.country.iso)
+                }
             }
         }
         item { BarSpacer() }

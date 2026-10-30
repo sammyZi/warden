@@ -3,7 +3,17 @@ package dev.warden.apps
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import dev.warden.design.Motion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -207,20 +217,35 @@ private fun Stat(value: String, label: String, paper: Color, muted: Color, modif
     }
 }
 
-/** This app's grade worked out: start at 100, minus each penalty, then the letter bands. */
+/** This app's grade worked out: start at 100, minus each penalty, then the letter bands. Folded until asked for. */
 @Composable
 private fun Breakdown(g: Grade) {
     val c = Warden.colors
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
-        Text(stringResource(R.string.report_formula), style = Warden.type.title)
-        Line(stringResource(R.string.report_start), "100")
-        HorizontalDivider(color = c.outline)
-        Line(pluralStringResource(R.plurals.report_line_companies, g.companies, g.companies), "−${g.companyPenalty}")
-        Line(stringResource(R.string.report_line_trackers, (g.trackerShare * 100).roundToInt()), "−${g.trackerPenalty}")
-        Line(stringResource(R.string.report_line_screen_off, (g.screenOffShare * 100).roundToInt()), "−${g.screenOffPenalty}")
-        HorizontalDivider(color = c.outline)
-        Line(stringResource(R.string.report_line_score, g.letter), g.score.toString(), strong = true)
-        Text(stringResource(R.string.report_bands), style = Warden.type.label, color = c.muted)
+    var open by rememberSaveable { mutableStateOf(false) }
+    val turn by animateFloatAsState(if (open) 90f else 0f, Motion.emphasized(Motion.MEDIUM), label = "caret")
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { open = !open },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.report_formula), Modifier.weight(1f), style = Warden.type.body.copy(fontWeight = FontWeight.Medium))
+        Icon(
+            painterResource(DesignR.drawable.ph_caret_right),
+            null,
+            Modifier.size(16.dp).graphicsLayer { rotationZ = turn },
+            tint = c.muted,
+        )
+    }
+    AnimatedVisibility(open) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+            Line(stringResource(R.string.report_start), "100")
+            HorizontalDivider(color = c.outline)
+            Line(pluralStringResource(R.plurals.report_line_companies, g.companies, g.companies), "−${g.companyPenalty}")
+            Line(stringResource(R.string.report_line_trackers, (g.trackerShare * 100).roundToInt()), "−${g.trackerPenalty}")
+            Line(stringResource(R.string.report_line_screen_off, (g.screenOffShare * 100).roundToInt()), "−${g.screenOffPenalty}")
+            HorizontalDivider(color = c.outline)
+            Line(stringResource(R.string.report_line_score, g.letter), g.score.toString(), strong = true)
+            Text(stringResource(R.string.report_bands), style = Warden.type.label, color = c.muted)
+        }
     }
 }
 
