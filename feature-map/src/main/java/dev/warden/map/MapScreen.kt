@@ -16,6 +16,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import dev.warden.design.Radii
@@ -120,7 +121,7 @@ fun MapScreen(
         .collectAsState(scope to emptyList())
     val events = loaded.second
     val topApps = remember(events) {
-        events.groupingBy { it.uid }.eachCount().entries.sortedByDescending { it.value }.map { it.key to it.value }
+        events.groupingBy { pickerUid(it.uid) }.eachCount().entries.sortedByDescending { it.value }.map { it.key to it.value }
     }
     // Up to 5,000 rows of geo lookups: grouped off the main thread.
     // Paired with the filters that produced it: when that changes, the globe and list animate in again.
@@ -128,7 +129,7 @@ fun MapScreen(
         val filters = listOf(loaded.first, appFilter, blockedOnly, trackersOnly)
         val next = withContext(Dispatchers.Default) {
             val shown = events.filter { e ->
-                (appFilter.isEmpty() || e.uid in appFilter) &&
+                (appFilter.isEmpty() || pickerUid(e.uid) in appFilter) &&
                     (!blockedOnly || e.blocked) &&
                     (!trackersOnly || Trackers.lookup(e.domain) != null)
             }
@@ -139,6 +140,8 @@ fun MapScreen(
     }
     val destinations = result.second
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
+    // The app picker sheet; the globe stops its idle spin while it's open so the list scrolls smoothly.
+    var picking by rememberSaveable { mutableStateOf(false) }
     // Lives outside the detail transition so coming back from a country keeps the scroll position.
     val listState = rememberLazyListState()
     BackHandler(enabled = detail != null) { detail = null }
@@ -164,14 +167,14 @@ fun MapScreen(
         val d = destinations.firstOrNull { it.country.iso == iso }
         if (iso == null || d == null) {
             Overview(
-                g, destinations, result.first, listState, onOpen = { detail = it },
+                g, destinations, result.first, listState, spin = !picking, onOpen = { detail = it },
                 filter = {
                     Row(
                         Modifier.padding(horizontal = Spacing.xl),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.s),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        AppFilter(topApps, appFilter, { appFilter = it }, appLabel, appIcon)
+                        AppFilter(topApps, appFilter, { appFilter = it }, appLabel, appIcon, picking) { picking = it }
                         TimeFilter(scope, { scope = it }, blockedOnly, { blockedOnly = it }, trackersOnly, { trackersOnly = it })
                     }
                 },
@@ -188,6 +191,7 @@ private fun Overview(
     destinations: List<Destination>,
     revealKey: Any,
     listState: LazyListState,
+    spin: Boolean,
     onOpen: (String) -> Unit,
     filter: @Composable () -> Unit,
 ) {
@@ -217,6 +221,7 @@ private fun Overview(
                 home = home,
                 destinations = destinations,
                 progress = { reveal.value },
+                spin = spin,
                 selected = selected,
                 camera = camera,
                 onSelect = { selected = it },
@@ -546,10 +551,11 @@ private fun AppFilter(
     onSelect: (Set<Int>) -> Unit,
     appLabel: (Int) -> String,
     appIcon: (Int) -> ImageBitmap?,
+    open: Boolean,
+    onOpen: (Boolean) -> Unit,
 ) {
     // Always shown, even with nothing to pick, so the filter row doesn't jump when data arrives.
     val c = Warden.colors
-    var open by rememberSaveable { mutableStateOf(false) }
     val any = selected.isNotEmpty()
     Box(Modifier.padding(vertical = Spacing.s).heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
         Row(
@@ -557,7 +563,7 @@ private fun AppFilter(
                 .clip(RoundedCornerShape(50))
                 .background(if (any) c.primary else c.surface)
                 .border(1.dp, if (any) c.primary else c.outline, RoundedCornerShape(50))
-                .clickable(enabled = apps.isNotEmpty(), role = Role.Button) { open = true }
+                .clickable(enabled = apps.isNotEmpty(), role = Role.Button) { onOpen(true) }
                 .padding(start = if (any) Spacing.s else Spacing.l, end = Spacing.m, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s),
@@ -581,8 +587,19 @@ private fun AppFilter(
         }
     }
     if (open) {
-        ModalBottomSheet(onDismissRequest = { open = false }, containerColor = c.background) {
-            AppPicker(apps, selected, onSelect, appLabel, appIcon, onDone = { open = false })
+        // Fully open from the start: half-open, a scroll in the list also dragged the sheet and it jittered.
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        // No drag on the sheet itself: at the list's ends a scroll was handed to the sheet and it bounced.
+        // It still closes with Done, Back or a tap outside.
+        ModalBottomSheet(
+            onDismissRequest = { onOpen(false) },
+            sheetState = sheet,
+            sheetGesturesEnabled = false,
+            containerColor = c.background,
+        ) {
+            // A snapshot taken when the sheet opens: live counts re-sorted the rows under your finger.
+            val frozen = remember { apps }
+            AppPicker(frozen, selected, onSelect, appLabel, appIcon, onDone = { onOpen(false) })
         }
     }
 }
@@ -600,7 +617,7 @@ private fun AppPicker(
     var query by rememberSaveable { mutableStateOf("") }
     val shown =
         remember(apps, query) { apps.filter { (uid, _) -> query.isBlank() || appLabel(uid).contains(query.trim(), ignoreCase = true) } }
-    Column(Modifier.fillMaxHeight(0.85f)) {
+    Column(Modifier.fillMaxHeight()) {
         BasicTextField(
             query,
             { query = it },
@@ -775,3 +792,6 @@ private fun scopeLabel(s: Scope): String = stringResource(
 
 /** What the screen shows for a set of destinations: country and count, in order. */
 private fun List<Destination>.signature() = map { it.country.iso to it.connections }
+
+/** System services use many UIDs below 10000 that all read "Android system"; the picker shows them as one. */
+private fun pickerUid(uid: Int) = if (uid in 0 until android.os.Process.FIRST_APPLICATION_UID) android.os.Process.SYSTEM_UID else uid

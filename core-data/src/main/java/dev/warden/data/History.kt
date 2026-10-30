@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** How far back a view looks. */
@@ -66,10 +67,18 @@ object History {
     }
 
     private val visible = MutableStateFlow(false)
+    private val shownScreens = AtomicInteger()
 
-    /** Warden's UI came to the front or left it. Screen queries only run while it's showing. */
-    fun setVisible(showing: Boolean) {
-        visible.value = showing
+    /**
+     * A Warden screen started or stopped. Counted, not a flag: when a second copy opens on top, the new
+     * one starts before the old one stops, and a flag left the app marked hidden (stats stopped updating).
+     */
+    fun screenStarted() {
+        visible.value = shownScreens.incrementAndGet() > 0
+    }
+
+    fun screenStopped() {
+        visible.value = shownScreens.decrementAndGet() > 0
     }
 
     /**

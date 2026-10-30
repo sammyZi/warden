@@ -232,7 +232,7 @@ private fun AppRow(
             if (icon != null) Image(icon, null, Modifier.size(36.dp)) else IconBadge(DesignR.drawable.ph_squares_four, hue)
             Column(Modifier.weight(1f)) {
                 Text(appLabel(r.uid), style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(caption(r), style = Warden.type.label.tabular(), color = c.muted, maxLines = 1)
+                captionLines(r).forEach { Text(it, style = Warden.type.label.tabular(), color = c.muted, maxLines = 1) }
             }
             Text(formatBytes(r.usage.total), style = Warden.type.body.copy(fontWeight = FontWeight.Medium).tabular())
             Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(16.dp), tint = c.muted)
@@ -244,12 +244,16 @@ private fun AppRow(
 }
 
 @Composable
-private fun caption(r: AppLine): String {
+/** Wi-Fi and mobile on their own lines (Android's counters), or sent / received (Warden's own history). */
+private fun captionLines(r: AppLine): List<String> {
     val u = r.usage
     return if (u.wifi != null && u.mobile != null) {
-        stringResource(R.string.tool_data_caption_networks, formatBytes(u.wifi), formatBytes(u.mobile))
+        listOf(
+            stringResource(R.string.tool_data_wifi, formatBytes(u.wifi)),
+            stringResource(R.string.tool_data_mobile, formatBytes(u.mobile)),
+        )
     } else {
-        stringResource(R.string.tool_data_caption, formatBytes(u.up), formatBytes(u.down))
+        listOf(stringResource(R.string.tool_data_caption, formatBytes(u.up), formatBytes(u.down)))
     }
 }
 

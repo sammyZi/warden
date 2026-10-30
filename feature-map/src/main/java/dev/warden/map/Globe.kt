@@ -80,6 +80,8 @@ internal fun Globe(
     modifier: Modifier = Modifier,
     /** Shared reveal progress (0..1) from the screen; when null the globe reveals itself once. */
     progress: (() -> Float)? = null,
+    /** Idle spin; off while something covers the globe, so it isn't redrawn every frame for nothing. */
+    spin: Boolean = true,
 ) {
     val c = Warden.colors
     val reduceMotion = Warden.reduceMotion
@@ -92,7 +94,7 @@ internal fun Globe(
     if (progress == null) LaunchedEffect(Unit) { reveal.animateTo(1f, Motion.emphasized(REVEAL_MS)) }
 
     // Slow idle spin; frames only run while this screen is on screen.
-    if (!reduceMotion) {
+    if (!reduceMotion && spin) {
         LaunchedEffect(camera) {
             var last = androidx.compose.runtime.withFrameNanos { it }
             while (true) {

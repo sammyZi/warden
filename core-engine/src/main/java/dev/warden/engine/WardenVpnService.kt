@@ -33,6 +33,7 @@ import com.celzero.firestack.settings.Settings
 import dev.warden.rules.AppRules
 import dev.warden.rules.Dns
 import dev.warden.rules.Rules
+import dev.warden.rules.Tor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,6 +61,11 @@ class WardenVpnService : VpnService(), Bridge {
     @Volatile private var systemTransport = Backend.Default
 
     @Volatile private var dohActive = false
+
+    // Tor via Orbot's SOCKS proxy: set up only while at least one app is routed through it.
+    @Volatile private var torReady = false
+
+    @Volatile private var torDns: String? = null
 
     // IPv6 on the real network, as the tunnel was built and as last seen. A change rebuilds the tunnel.
     @Volatile private var tunnelHas6 = false
@@ -161,6 +167,7 @@ class WardenVpnService : VpnService(), Bridge {
         }
         useSystemDns(lp)
         useEncryptedDns()
+        useTor()
         cm.registerDefaultNetworkCallback(networkCallback)
         Engine.setRunning(true)
         resets = CoroutineScope(Dispatchers.Default).launch {
@@ -220,6 +227,24 @@ class WardenVpnService : VpnService(), Bridge {
         }.onFailure { Log.w(TAG, "doh upstream $url", it) }.isSuccess
         dnsTransport = if (dohActive) Backend.Preferred else systemTransport
         Log.i(TAG, "dns via ${if (dohActive) url else "phone"}")
+    }
+
+    /**
+     * Point firestack at Orbot's local SOCKS port for apps routed through Tor, and resolve their lookups
+     * through the same proxy so the names don't leak to the regular resolver.
+     */
+    private fun useTor() {
+        torReady = false
+        torDns = null
+        if (Tor.apps.value.isEmpty()) return
+        val t = tunnel ?: return
+        val proxy = runCatching { t.proxies.addProxy(Backend.OrbotS5, "socks5://127.0.0.1:${Tor.socksPort}") }
+            .onFailure { Log.w(TAG, "tor proxy", it) }.getOrNull() ?: return
+        torReady = true
+        // DNS over the proxy; firestack registers it under the proxy's id. Without it, Tor apps' lookups
+        // fall back to the encrypted or system resolver (the connections themselves still go via Tor).
+        torDns = runCatching { Intra.addProxyDNS(t, proxy) }.map { proxy.id() }
+            .onFailure { Log.w(TAG, "tor dns", it) }.getOrNull()
     }
 
     /** Rebuild the tunnel in place, e.g. after the excluded-apps list changed. */
@@ -329,22 +354,28 @@ class WardenVpnService : VpnService(), Bridge {
         // An app talking to its own encrypted resolver would skip every rule below, so that's refused too.
         val bypass = !toOurDns && uid != Process.myUid() && Dns.config.value.stopBypass &&
             Dns.isBypass(names, host(dst), port(dst))
-        val blocked = !toOurDns && (bypass || Rules.blocks(uid, names, cellular))
+        // Tor carries TCP only, so a Tor app's UDP (QUIC, mostly) is refused; it retries over TCP.
+        val tor = !toOurDns && Tor.uses(uid)
+        val blocked = !toOurDns && (bypass || Rules.blocks(uid, names, cellular) || (tor && protocol == UDP))
         if (!toOurDns) {
             Engine.record(
                 NetEvent(cid, System.currentTimeMillis(), uid, protocolName(protocol), names.firstOrNull(), dst, blocked),
             )
         }
         return Mark().apply {
-            // Base = handled inside the tunnel (our fake DNS), Exit = dial out directly, Block = refuse.
-            pidcsv = when {
-                toOurDns -> Backend.Base
-                blocked -> Backend.Block
-                else -> Backend.Exit
-            }
+            pidcsv = route(toOurDns, blocked, tor)
             this.cid = cid
             this.uid = uid.toString()
         }
+    }
+
+    /** Base = handled inside the tunnel (our fake DNS), Exit = dial out directly, Block = refuse. */
+    private fun route(toOurDns: Boolean, blocked: Boolean, tor: Boolean): String = when {
+        toOurDns -> Backend.Base
+        blocked -> Backend.Block
+        // Fail closed: with Tor chosen but not set up, the app gets nothing rather than going direct.
+        tor -> if (torReady) Backend.OrbotS5 else Backend.Block
+        else -> Backend.Exit
     }
 
     override fun inflow(protocol: Int, uid: Int, src: String, dst: String): Mark = Mark().apply {
@@ -365,7 +396,11 @@ class WardenVpnService : VpnService(), Bridge {
         this.uid = uid
         ipcsv = ""
         // BlockAll answers 0.0.0.0 / ::, which apps give up on at once (checked on device), unlike NXDOMAIN.
-        tidcsv = if (queryBlocked(uid, normalize(domain))) Backend.BlockAll else dnsTransport
+        tidcsv = when {
+            queryBlocked(uid, normalize(domain)) -> Backend.BlockAll
+            Tor.uses(uid.toIntOrNull() ?: UNKNOWN_UID) -> torDns ?: dnsTransport
+            else -> dnsTransport
+        }
     }
 
     /** Rules, plus looking up a public encrypted-DNS host (the first step of going around Warden). */
@@ -425,6 +460,7 @@ class WardenVpnService : VpnService(), Bridge {
         private const val MTU = 1500
         private const val MS_PER_S = 1000
         private const val NOTIFY_EVERY_MS = 10_000L
+        private const val UDP = 17
         private const val UNKNOWN_UID = -1
 
         // Private ranges, same shape as Rethink's defaults: .1 is us, .3 is the fake DNS server.

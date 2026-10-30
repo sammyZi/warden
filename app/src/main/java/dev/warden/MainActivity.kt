@@ -29,14 +29,14 @@ import dev.warden.rules.Rules
 
 class MainActivity : ComponentActivity() {
 
-    // History's screen queries run only while Warden is on screen (see History.setVisible).
+    // History's screen queries run only while Warden is on screen (see History.screenStarted).
     override fun onStart() {
         super.onStart()
-        History.setVisible(true)
+        History.screenStarted()
     }
 
     override fun onStop() {
-        History.setVisible(false)
+        History.screenStopped()
         super.onStop()
     }
 
