@@ -125,6 +125,8 @@ fun DashboardScreen(
             )
             Spacer(Modifier.height(Spacing.l))
             ProtectionPill(state, onPowerClick)
+            Spacer(Modifier.height(Spacing.s))
+            DnsCard(onOpenSettings)
             PrivateDnsWarning()
             if (!blocklistsOn) {
                 // Nothing is blocked until a list is on; say so where the zero shows up.

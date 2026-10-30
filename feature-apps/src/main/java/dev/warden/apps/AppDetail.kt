@@ -317,8 +317,6 @@ private fun AccessCard(uid: Int, name: String) {
                 enabled = packages.isNotEmpty(),
             )
         }
-        HorizontalDivider(color = c.outline)
-        TorRow(uid, name)
     }
 }
 

@@ -102,15 +102,4 @@
     <string name="apps_data_warden_only">Counted only while Warden was on. Allow Usage access on the Data screen to count it all the time.</string>
     <string name="apps_domains_title">Domains · %1$d</string>
     <string name="apps_domains_hint">Tap one to see its connections or block it.</string>
-    <string name="tor_route">Route through Tor</string>
-    <string name="tor_route_for">Route %1$s through Tor</string>
-    <string name="tor_off">Direct</string>
-    <string name="tor_on">Through Tor</string>
-    <string name="tor_starting">Tor is starting…</string>
-    <string name="tor_waiting">Waiting for Orbot</string>
-    <string name="tor_needs_orbot">Needs Orbot</string>
-    <string name="tor_get_orbot_body">Tor hides which sites this app talks to from your network, and its location from those sites. Warden uses the free Orbot app to run Tor.</string>
-    <string name="tor_get_orbot">Get Orbot</string>
-    <string name="tor_offline_note">Until Tor is running, %1$s stays offline instead of going around it. Open Orbot and connect, or try starting it from here.</string>
-    <string name="tor_start_orbot">Start Orbot</string>
 </resources>
