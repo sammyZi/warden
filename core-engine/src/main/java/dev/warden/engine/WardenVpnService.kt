@@ -30,6 +30,7 @@ import com.celzero.firestack.intra.PreMark
 import com.celzero.firestack.intra.Tunnel
 import com.celzero.firestack.settings.Settings
 import dev.warden.rules.AppRules
+import dev.warden.rules.Dns
 import dev.warden.rules.Rules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +57,15 @@ class WardenVpnService : VpnService(), Bridge {
 
     @Volatile private var dnsTransport = Backend.Default
 
+    @Volatile private var systemTransport = Backend.Default
+
+    @Volatile private var dohActive = false
+
+    // IPv6 on the real network, as the tunnel was built and as last seen. A change rebuilds the tunnel.
+    @Volatile private var tunnelHas6 = false
+
+    @Volatile private var underlying6: Boolean? = null
+
     @Volatile private var cellular = false // per-app rules differ for Wi-Fi and mobile data
     private val ids = AtomicLong()
     private val mainHandler by lazy { Handler(mainLooper) }
@@ -66,6 +76,13 @@ class WardenVpnService : VpnService(), Bridge {
             // Some devices report our own tunnel here; its DNS is us, so taking it would loop.
             if (cm.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) return
             useSystemDns(lp)
+            // Moving between an IPv4-only and a dual-stack network: rebuild so v6 is routed (or dropped) to match.
+            val has6 = hasIpv6(lp)
+            underlying6 = has6
+            if (tunnel != null && has6 != tunnelHas6) {
+                Log.i(TAG, "ipv6 ${if (has6) "appeared" else "went away"}, restarting tunnel")
+                mainHandler.post { reconnect() }
+            }
         }
 
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
@@ -108,9 +125,10 @@ class WardenVpnService : VpnService(), Bridge {
     private fun connect() {
         val lp = cm.getLinkProperties(cm.activeNetwork)
         // Only claim IPv6 when the real network has it; then route all global unicast v6 so none leaks.
-        // ponytail: decided once at start; re-establish on v4<->v6 network changes comes with M2.
+        // On a rebuild the active network can briefly be our own VPN, so prefer what the callback last saw.
         cellular = cm.getNetworkCapabilities(cm.activeNetwork)?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
-        val has6 = lp?.routes.orEmpty().any { it.isDefaultRoute && it.destination.address is Inet6Address }
+        val has6 = underlying6 ?: hasIpv6(lp)
+        tunnelHas6 = has6
 
         val builder = Builder()
             .setSession(getString(R.string.engine_session))
@@ -142,6 +160,7 @@ class WardenVpnService : VpnService(), Bridge {
             )
         }
         useSystemDns(lp)
+        useEncryptedDns()
         cm.registerDefaultNetworkCallback(networkCallback)
         Engine.setRunning(true)
         // Keep the notification's blocked count current; events already arrive in 500ms batches.
@@ -174,11 +193,24 @@ class WardenVpnService : VpnService(), Bridge {
         val t = tunnel ?: return
         val csv = lp?.dnsServers.orEmpty().mapNotNull { it.hostAddress }.joinToString(",")
         Log.i(TAG, "upstream dns: ${csv.ifEmpty { "none, using builtin default" }}")
-        dnsTransport = if (csv.isNotEmpty() && runCatching { Intra.setSystemDNS(t, csv) }.isSuccess) {
+        systemTransport = if (csv.isNotEmpty() && runCatching { Intra.setSystemDNS(t, csv) }.isSuccess) {
             Backend.System
         } else {
             Backend.Default
         }
+        dnsTransport = if (dohActive) Backend.Preferred else systemTransport
+    }
+
+    /** If Settings picked an encrypted upstream, send allowed lookups there over DNS-over-HTTPS instead. */
+    private fun useEncryptedDns() {
+        val t = tunnel ?: return
+        val config = Dns.config.value
+        val url = config.dohUrl
+        dohActive = url != null && runCatching {
+            Intra.addDoHTransport(t, Backend.Preferred, url, config.upstream.bootstrap)
+        }.onFailure { Log.w(TAG, "doh upstream $url", it) }.isSuccess
+        dnsTransport = if (dohActive) Backend.Preferred else systemTransport
+        Log.i(TAG, "dns via ${if (dohActive) url else "phone"}")
     }
 
     /** Rebuild the tunnel in place, e.g. after the excluded-apps list changed. */
@@ -285,7 +317,10 @@ class WardenVpnService : VpnService(), Bridge {
         val cid = ids.incrementAndGet().toString()
         val toOurDns = host(dst) == DNS4 || host(dst) == DNS6
         val names = (domains.split(',') + probableDomains.split(',')).map(::normalize).filter { it.isNotEmpty() }
-        val blocked = !toOurDns && Rules.blocks(uid, names, cellular)
+        // An app talking to its own encrypted resolver would skip every rule below, so that's refused too.
+        val bypass = !toOurDns && uid != Process.myUid() && Dns.config.value.stopBypass &&
+            Dns.isBypass(names, host(dst), port(dst))
+        val blocked = !toOurDns && (bypass || Rules.blocks(uid, names, cellular))
         if (!toOurDns) {
             Engine.record(
                 NetEvent(cid, System.currentTimeMillis(), uid, protocolName(protocol), names.firstOrNull(), dst, blocked),
@@ -320,7 +355,15 @@ class WardenVpnService : VpnService(), Bridge {
     override fun onQuery(who: String, uid: String, domain: String, qtyp: Long): DNSOpts = DNSOpts().apply {
         this.uid = uid
         ipcsv = ""
-        tidcsv = if (Rules.blocks(uid.toIntOrNull() ?: UNKNOWN_UID, listOf(normalize(domain)), cellular)) Backend.BlockAll else dnsTransport
+        // BlockAll answers 0.0.0.0 / ::, which apps give up on at once (checked on device), unlike NXDOMAIN.
+        tidcsv = if (queryBlocked(uid, normalize(domain))) Backend.BlockAll else dnsTransport
+    }
+
+    /** Rules, plus looking up a public encrypted-DNS host (the first step of going around Warden). */
+    private fun queryBlocked(uid: String, name: String): Boolean {
+        val id = uid.toIntOrNull() ?: UNKNOWN_UID
+        if (Rules.blocks(id, listOf(name), cellular)) return true
+        return id != Process.myUid() && Dns.config.value.stopBypass && Dns.isResolverHost(name)
     }
 
     override fun onResponse(s: DNSSummary?) {
@@ -334,7 +377,7 @@ class WardenVpnService : VpnService(), Bridge {
                 kind = "dns",
                 domain = name,
                 target = s.rData.ifEmpty { "no answer" },
-                blocked = Rules.blocks(s.uid.toIntOrNull() ?: UNKNOWN_UID, listOf(name), cellular),
+                blocked = queryBlocked(s.uid, name),
                 latencyMs = (s.latency * MS_PER_S).toInt().takeIf { it > 0 },
                 failed = s.rData.isEmpty(),
             ),
@@ -383,6 +426,11 @@ class WardenVpnService : VpnService(), Bridge {
         private fun normalize(name: String) = name.trim().trimEnd('.').lowercase()
 
         private fun host(ipPort: String) = ipPort.substringBeforeLast(':').trim('[', ']')
+
+        private fun port(ipPort: String) = ipPort.substringAfterLast(':').toIntOrNull() ?: 0
+
+        private fun hasIpv6(lp: LinkProperties?) =
+            lp?.routes.orEmpty().any { it.isDefaultRoute && it.destination.address is Inet6Address }
 
         private fun socketAddress(ipPort: String) =
             InetSocketAddress(InetAddress.getByName(host(ipPort)), ipPort.substringAfterLast(':').toInt())

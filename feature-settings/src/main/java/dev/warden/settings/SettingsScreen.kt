@@ -181,6 +181,10 @@ private fun SettingsHome(
             }
         }
 
+        Section(stringResource(R.string.dns_title), note = stringResource(R.string.dns_note)) {
+            DnsSettings()
+        }
+
         Section(stringResource(R.string.settings_appearance)) {
             SegmentedControl(
                 ThemeMode.entries.map {

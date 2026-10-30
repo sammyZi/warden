@@ -50,4 +50,21 @@
     <string name="settings_credits_title">Open-source credits</string>
     <string name="settings_credits">Engine: firestack (MPL-2.0). IP geolocation by DB-IP.com (CC BY 4.0). Map: Natural Earth. Font: Rubik (OFL). Icons: Phosphor (MIT).</string>
     <string name="settings_version">Version %1$s</string>
+    <string name="dns_title">DNS</string>
+    <string name="dns_note">How your apps look up addresses. Changes apply right away.</string>
+    <string name="dns_upstream">Lookups go to</string>
+    <string name="dns_upstream_phone">Phone\'s DNS</string>
+    <string name="dns_upstream_cloudflare">Cloudflare</string>
+    <string name="dns_upstream_quad9">Quad9</string>
+    <string name="dns_upstream_custom">Custom</string>
+    <string name="dns_upstream_phone_note">Whatever your Wi-Fi or carrier provides. They can see the sites you look up.</string>
+    <string name="dns_upstream_doh_note">Encrypted (DNS-over-HTTPS), so your Wi-Fi or carrier can\'t see or change your lookups.</string>
+    <string name="dns_upstream_custom_note">Your own DNS-over-HTTPS server. Until a URL is saved, your phone\'s DNS is used.</string>
+    <string name="dns_custom_hint">https://example.com/dns-query</string>
+    <string name="dns_custom_save">Save</string>
+    <string name="dns_custom_in_use">In use.</string>
+    <string name="dns_custom_ready">Save to start using it.</string>
+    <string name="dns_custom_invalid">Needs to start with https://</string>
+    <string name="dns_bypass">Stop apps going around Warden</string>
+    <string name="dns_bypass_note">Blocks apps\' own DNS servers, including encrypted ones like Chrome\'s Secure DNS, so every lookup passes Warden\'s rules.</string>
 </resources>
