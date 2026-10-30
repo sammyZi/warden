@@ -25,6 +25,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.TextAutoSize
 import kotlinx.coroutines.delay
 import java.text.NumberFormat
 import kotlin.math.roundToInt
@@ -54,7 +55,14 @@ private val BYTE_UNITS = listOf("B", "KB", "MB", "GB", "TB")
 
 /** A number that counts up from 0 on first show (~600ms), then animates to each new value. */
 @Composable
-fun CountUpText(value: Int, style: TextStyle, modifier: Modifier = Modifier, color: Color = Color.Unspecified, compact: Boolean = false) {
+fun CountUpText(
+    value: Int,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    compact: Boolean = false,
+    autoSize: TextAutoSize? = null,
+) {
     val reduceMotion = Warden.reduceMotion
     val anim = remember { Animatable(if (reduceMotion) value.toFloat() else 0f) }
     LaunchedEffect(value) {
@@ -71,6 +79,7 @@ fun CountUpText(value: Int, style: TextStyle, modifier: Modifier = Modifier, col
         color = color,
         maxLines = 1,
         softWrap = false,
+        autoSize = autoSize,
     )
 }
 

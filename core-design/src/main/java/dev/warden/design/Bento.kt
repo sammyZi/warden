@@ -11,6 +11,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -141,7 +142,13 @@ fun StatSquare(@DrawableRes icon: Int, hue: Color, value: Int, label: String, mo
     ) {
         Icon(painterResource(icon), null, Modifier.size(18.dp), tint = hue)
         Column {
-            CountUpText(value, Warden.type.headline, compact = true)
+            // Shrinks to fit the square rather than clipping ("1.1K" at large font scales).
+            CountUpText(
+                value,
+                Warden.type.headline,
+                compact = true,
+                autoSize = TextAutoSize.StepBased(12.sp, Warden.type.headline.fontSize),
+            )
             Text(
                 label.uppercase(),
                 style = Warden.type.caption.copy(fontSize = 9.sp, letterSpacing = 0.3.sp),

@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -45,6 +44,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -68,10 +69,10 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import kotlin.math.roundToInt
-import dev.warden.design.Tile
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.warden.design.IconBadge
 import dev.warden.design.Motion
 import dev.warden.design.SectionLabel
@@ -248,10 +249,11 @@ private fun Overview(
                 }
             }
         }
-        items(destinations, key = { it.country.iso }) { d ->
+        val most = destinations.maxOfOrNull { it.connections } ?: 1
+        itemsIndexed(destinations, key = { _, d -> d.country.iso }) { i, d ->
             // New countries fade in and the rest slide to their new rank when a filter changes.
             Box(if (reduceMotion) Modifier else Modifier.animateItem()) {
-                CountryRow(d, total) {
+                CountryRow(d, total, most, first = i == 0, last = i == destinations.lastIndex) {
                     selected = d.country.iso
                     scope.launch { camera.focus(d.country.lat, d.country.lon) }
                     onOpen(d.country.iso)
@@ -263,26 +265,45 @@ private fun Overview(
 }
 
 /** A country as a card: code badge in its hue, name and counts, share of all traffic, share bar. */
+/**
+ * One row of the countries table. The rows join into a single panel with thin dividers; each row's
+ * background fills from the left by its share of the busiest country, so the list reads as a bar chart.
+ */
 @Composable
-private fun CountryRow(d: Destination, total: Int, onClick: () -> Unit) {
+private fun CountryRow(d: Destination, total: Int, most: Int, first: Boolean, last: Boolean, onClick: () -> Unit) {
     val c = Warden.colors
     val hue = countryHue(d.country.iso, c.palette)
-    Tile(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.xs).fillMaxWidth(), onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-            Box(Modifier.size(40.dp).background(hue.copy(alpha = 0.18f), CircleShape), contentAlignment = Alignment.Center) {
-                Text(
-                    d.country.iso.removePrefix(Geo.EDGE_PREFIX),
-                    style = Warden.type.label.copy(fontWeight = FontWeight.SemiBold),
-                    color = hue,
-                )
-            }
+    val r = Radii.medium
+    val shape =
+        RoundedCornerShape(if (first) r else 0.dp, if (first) r else 0.dp, if (last) r else 0.dp, if (last) r else 0.dp)
+    val fill = d.connections / most.coerceAtLeast(1).toFloat()
+    Column(Modifier.padding(horizontal = Spacing.l)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(c.surface)
+                .drawBehind { drawRect(hue.copy(alpha = SHARE_ALPHA), size = size.copy(width = size.width * fill)) }
+                .clickable(onClick = onClick)
+                .heightIn(min = 64.dp)
+                .padding(horizontal = Spacing.l, vertical = Spacing.m),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.m),
+        ) {
+            CountryMark(d.country.iso, hue)
             Column(Modifier.weight(1f)) {
-                Text(countryName(d.country.iso), style = Warden.type.body.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+                Text(
+                    countryName(d.country.iso),
+                    style = Warden.type.body.copy(fontWeight = FontWeight.Medium),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text(
                     pluralStringResource(R.plurals.map_connections, d.connections, d.connections) + " · " +
                         pluralStringResource(R.plurals.map_n_apps, d.apps, d.apps),
                     style = Warden.type.label.tabular(),
                     color = c.muted,
+                    maxLines = 1,
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -290,11 +311,31 @@ private fun CountryRow(d: Destination, total: Int, onClick: () -> Unit) {
                 if (d.blocked > 0) BlockedTag(d.blocked)
             }
         }
-        Box(Modifier.fillMaxWidth().height(4.dp).background(c.surfaceVariant, RoundedCornerShape(2.dp))) {
-            Box(Modifier.fillMaxWidth(d.connections / total.toFloat()).fillMaxHeight().background(hue, RoundedCornerShape(2.dp)))
+        if (!last) HorizontalDivider(Modifier.background(c.surface), color = c.outline)
+    }
+}
+
+/** The country's flag; CDN edges have no flag, so they keep a short tinted code. */
+@Composable
+private fun CountryMark(iso: String, hue: Color) {
+    val flag = flagOf(iso)
+    Box(Modifier.size(40.dp).background(hue.copy(alpha = 0.16f), CircleShape), contentAlignment = Alignment.Center) {
+        if (flag != null) {
+            Text(flag, fontSize = 22.sp)
+        } else {
+            Text(iso.removePrefix(Geo.EDGE_PREFIX), style = Warden.type.label.copy(fontWeight = FontWeight.SemiBold), color = hue)
         }
     }
 }
+
+/** Flag emoji from a two-letter country code (regional indicator pairs); null for edges and unknowns. */
+internal fun flagOf(iso: String): String? {
+    if (iso.length != 2 || !iso.all { it in 'A'..'Z' }) return null
+    return iso.map { String(Character.toChars(REGIONAL_A + (it - 'A'))) }.joinToString("")
+}
+
+private const val REGIONAL_A = 0x1F1E6
+private const val SHARE_ALPHA = 0.12f
 
 /** Everything that went to one country: totals, the apps that went there, every connection. */
 @Composable
