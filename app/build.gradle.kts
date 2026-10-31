@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -26,15 +28,20 @@ android {
         }
     }
 
-    // Real release signing comes from the environment (CI secrets); locally it falls back to the debug key.
-    val keystore = providers.environmentVariable("WARDEN_KEYSTORE").orNull
+    // Release signing: CI passes the key through environment variables (repo secrets); a local machine
+    // reads ~/.android/warden-release.properties. Neither is in the repo. With neither, the debug key is used.
+    val local = File(System.getProperty("user.home"), ".android/warden-release.properties")
+        .takeIf { it.isFile }
+        ?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
+    fun signing(env: String, prop: String): String? = providers.environmentVariable(env).orNull ?: local?.getProperty(prop)
+    val keystore = signing("WARDEN_KEYSTORE", "storeFile")
     signingConfigs {
         create("release") {
             if (keystore != null) {
                 storeFile = file(keystore)
-                storePassword = providers.environmentVariable("WARDEN_KEYSTORE_PASSWORD").get()
-                keyAlias = providers.environmentVariable("WARDEN_KEY_ALIAS").get()
-                keyPassword = providers.environmentVariable("WARDEN_KEY_PASSWORD").get()
+                storePassword = signing("WARDEN_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signing("WARDEN_KEY_ALIAS", "keyAlias")
+                keyPassword = signing("WARDEN_KEY_PASSWORD", "keyPassword")
             }
         }
     }
