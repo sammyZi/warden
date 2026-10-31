@@ -45,12 +45,13 @@ import dev.warden.design.R as DesignR
  * Same setting as Settings > DNS; a custom server's URL is still entered there.
  */
 @Composable
-internal fun DnsCard(onOpenSettings: () -> Unit) {
+internal fun DnsCard(active: Boolean, onOpenSettings: () -> Unit) {
     val c = Warden.colors
     val config by Dns.config.collectAsState()
     var picking by rememberSaveable { mutableStateOf(false) }
-    val encrypted = config.dohUrl != null
-    val hue = upstreamHue(config.upstream, encrypted)
+    // The choice only applies while protection is on; with it off the phone resolves on its own, unencrypted.
+    val encrypted = active && config.dohUrl != null
+    val hue = if (active) upstreamHue(config.upstream, encrypted) else c.muted
     val shape = RoundedCornerShape(Radii.medium)
 
     Row(
@@ -78,7 +79,13 @@ internal fun DnsCard(onOpenSettings: () -> Unit) {
                 style = Warden.type.body.copy(fontWeight = FontWeight.Medium),
             )
             Text(
-                stringResource(if (encrypted) R.string.dns_card_private else R.string.dns_card_visible),
+                stringResource(
+                    when {
+                        !active -> R.string.dns_card_inactive
+                        encrypted -> R.string.dns_card_private
+                        else -> R.string.dns_card_visible
+                    },
+                ),
                 style = Warden.type.label,
                 color = hue,
             )

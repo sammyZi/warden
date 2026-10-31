@@ -91,4 +91,5 @@
     <string name="dns_option_custom">Set up in Settings</string>
     <string name="dns_title_phone">Your network\'s DNS</string>
     <string name="dns_title_custom">Custom server</string>
+    <string name="dns_card_inactive">Off until protection is on</string>
 </resources>
