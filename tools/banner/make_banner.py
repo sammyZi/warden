@@ -62,7 +62,7 @@ def rounded_mask(size, radius):
 def device(shot, height):
     """
     A screenshot inside a modern phone: thin dark bezel, a metallic edge that catches the light,
-    a punch-hole camera, and side buttons. Returns an RGBA image.
+    and side buttons (no camera hole, so it doesn't sit on the app's title). Returns an RGBA image.
     """
     screen = shot.crop((0, STATUS_BAR, shot.width, shot.height))
     sw = round(screen.width * height / screen.height)
@@ -85,11 +85,6 @@ def device(shot, height):
     out.paste(body, (edge, edge), rounded_mask(body.size, 49))
     # Screen.
     out.paste(screen, (edge + bezel, edge + bezel), rounded_mask(screen.size, 38))
-    # Punch-hole camera with a faint lens ring.
-    cx, cy, r = w // 2, edge + bezel + 18, 8
-    d = ImageDraw.Draw(out)
-    d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(8, 8, 8, 255))
-    d.ellipse((cx - 3, cy - 3, cx + 1, cy + 1), fill=(40, 46, 60, 255))
     # A soft diagonal glare across the glass.
     glare = Image.new("L", out.size, 0)
     ImageDraw.Draw(glare).polygon([(0, 0), (w * 0.55, 0), (0, h * 0.42)], fill=26)
