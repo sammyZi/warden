@@ -76,20 +76,18 @@
     <string name="data_up_down">↑ %1$s sent  ·  ↓ %2$s received</string>
     <string name="data_share">%1$d%% of the total</string>
     <string name="data_busiest">Busiest around %1$s, with %2$s.</string>
-    <string name="dns_card_title">DNS · %1$s</string>
-    <string name="dns_card_private">Encrypted</string>
-    <string name="dns_card_visible">Not encrypted</string>
-    <string name="dns_card_change">Change</string>
     <string name="dns_sheet_title">Where lookups go</string>
     <string name="dns_name_phone">Your network</string>
     <string name="dns_name_cloudflare">Cloudflare</string>
     <string name="dns_name_quad9">Quad9</string>
     <string name="dns_name_custom">Custom</string>
-    <string name="dns_option_phone">Not encrypted</string>
-    <string name="dns_option_cloudflare">Encrypted · fast</string>
-    <string name="dns_option_quad9">Encrypted · blocks malware</string>
-    <string name="dns_option_custom">Set up in Settings</string>
     <string name="dns_title_phone">Your network\'s DNS</string>
     <string name="dns_title_custom">Custom server</string>
-    <string name="dns_card_inactive">Off until protection is on</string>
+    <string name="dns_card_overline">DNS</string>
+    <string name="dns_pill_off">Off</string>
+    <string name="dns_tag_encrypted">Encrypted</string>
+    <string name="dns_tag_plain">Not encrypted</string>
+    <string name="dns_tag_fast">Fast</string>
+    <string name="dns_tag_malware">Blocks malware</string>
+    <string name="dns_tag_yours">Your server</string>
 </resources>

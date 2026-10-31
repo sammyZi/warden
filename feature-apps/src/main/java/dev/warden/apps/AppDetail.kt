@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.warden.design.IconBadge
 import dev.warden.design.Motion
 import dev.warden.design.Radii
 import dev.warden.design.SectionLabel
@@ -90,6 +91,7 @@ internal fun AppDetail(
     appIcon: (Int) -> ImageBitmap?,
     shared: Shared,
     onBack: () -> Unit,
+    onShowOnMap: (Int) -> Unit,
 ) {
     val c = Warden.colors
     val mine = remember(events, uid) { events.filter { it.uid == uid } }
@@ -136,7 +138,21 @@ internal fun AppDetail(
                     }
                 }
             }
-            ReportRow(report.grade.letter, Modifier.padding(horizontal = Spacing.xl)) { showReport = true }
+            // Two quick ways out of the header: the report card, and this app's traffic on the globe.
+            Row(Modifier.padding(horizontal = Spacing.xl), horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                ActionTile(
+                    stringResource(R.string.report_tile_title, report.grade.letter),
+                    stringResource(R.string.report_row_short),
+                    Modifier.weight(1f),
+                    lead = { GradeBadge(report.grade.letter, 36.dp) },
+                ) { showReport = true }
+                ActionTile(
+                    stringResource(R.string.apps_see_on_map),
+                    stringResource(R.string.apps_see_on_map_body),
+                    Modifier.weight(1f),
+                    lead = { IconBadge(DesignR.drawable.ph_globe_hemisphere_west, c.palette[4]) },
+                ) { onShowOnMap(uid) }
+            }
             if (showReport) ReportCardSheet(report, name, appIcon(uid)) { showReport = false }
         }
         // Each part of the page is its own labelled card, with room between them.
@@ -399,28 +415,27 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     }
 }
 
-/** The grade with words beside it, so it reads as something to tap: "Privacy grade B · See the report card". */
+/** A half-width tappable card with a badge, a title and a short line: reads as something to tap. */
 @Composable
-private fun ReportRow(letter: String, modifier: Modifier, onClick: () -> Unit) {
+private fun ActionTile(title: String, body: String, modifier: Modifier, lead: @Composable () -> Unit, onClick: () -> Unit) {
     val c = Warden.colors
     val shape = RoundedCornerShape(Radii.medium)
     Row(
         modifier
-            .fillMaxWidth()
             .clip(shape)
             .background(c.surface)
             .border(1.dp, c.outline, shape)
             .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 64.dp)
             .padding(Spacing.m),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.m),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
     ) {
-        GradeBadge(letter, 40.dp)
+        lead()
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.report_row_title, letter), style = Warden.type.body.copy(fontWeight = FontWeight.Medium))
-            Text(stringResource(R.string.report_row_body), style = Warden.type.label, color = c.muted)
+            Text(title, style = Warden.type.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(body, style = Warden.type.label, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(16.dp), tint = c.muted)
     }
 }
 

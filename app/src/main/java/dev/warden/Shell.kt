@@ -121,6 +121,8 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
     var openApp by rememberSaveable { mutableStateOf<Int?>(null) }
     // Where an app's detail was opened from, so Back returns there instead of to the Apps list.
     var returnTo by rememberSaveable { mutableStateOf<Tab?>(null) }
+    // An app to show on the Map, handed over from its detail screen; the Map clears it once applied.
+    var mapFocus by rememberSaveable { mutableStateOf<Int?>(null) }
     val openFrom: (Int) -> Unit = {
         openApp = it
         returnTo = tab
@@ -181,8 +183,17 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
                                 returnTo = null
                                 tab = back
                             }
+                        }, onShowOnMap = {
+                            mapFocus = it
+                            tab = Tab.Map
                         })
-                        Tab.Map -> MapScreen(apps::label, apps::icon, onOpenApp = openFrom)
+                        Tab.Map -> MapScreen(
+                            apps::label,
+                            apps::icon,
+                            onOpenApp = openFrom,
+                            focusApp = mapFocus,
+                            onFocusApplied = { mapFocus = null },
+                        )
                         Tab.Log -> LogScreen(events, running, apps::label, apps::icon)
                         Tab.Settings -> SettingsScreen(
                             version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty(),

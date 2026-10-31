@@ -105,6 +105,8 @@ fun MapScreen(
     appIcon: (Int) -> ImageBitmap?,
     onOpenApp: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    focusApp: Int? = null,
+    onFocusApplied: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val geo by produceState<Geo?>(null) { value = withContext(Dispatchers.IO) { loadGeo(context) } }
@@ -114,6 +116,13 @@ fun MapScreen(
     // ponytail: plain remember, so a rotation resets them.
     var scope by remember { mutableStateOf(Scope.Session) }
     var appFilter by remember { mutableStateOf(emptySet<Int>()) }
+    // "See on map" from an app's detail: show just that app, over today (this session may be empty).
+    LaunchedEffect(focusApp) {
+        val uid = focusApp ?: return@LaunchedEffect
+        appFilter = setOf(pickerUid(uid))
+        scope = Scope.Today
+        onFocusApplied()
+    }
     var blockedOnly by remember { mutableStateOf(false) }
     var trackersOnly by remember { mutableStateOf(false) }
     // Tagged with the scope they were loaded for, so the reveal below restarts only once new rows arrive.

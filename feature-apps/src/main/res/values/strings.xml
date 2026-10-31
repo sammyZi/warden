@@ -102,4 +102,25 @@
     <string name="apps_data_warden_only">Counted only while Warden was on. Allow Usage access on the Data screen to count it all the time.</string>
     <string name="apps_domains_title">Domains · %1$d</string>
     <string name="apps_domains_hint">Tap one to see its connections or block it.</string>
+    <plurals name="apps_summary_all">
+        <item quantity="one">%d app can go online. Tap one to see or limit it.</item>
+        <item quantity="other">%d apps can go online. Tap one to see or limit it.</item>
+    </plurals>
+    <string name="apps_search">Search apps</string>
+    <string name="apps_filter_active">Active</string>
+    <string name="apps_filter_all">All apps</string>
+    <string name="apps_filter_ruled">With rules</string>
+    <string name="apps_no_traffic">No traffic yet</string>
+    <string name="apps_none_match">No apps here</string>
+    <string name="apps_none_match_body">Try another name, or switch to All apps.</string>
+    <string name="apps_rule_offline">Offline</string>
+    <string name="apps_rule_no_wifi">No Wi-Fi</string>
+    <string name="apps_rule_no_mobile">No mobile</string>
+    <string name="apps_rule_skipped">Skips Warden</string>
+    <string name="report_row_short">Report card</string>
+    <string name="apps_see_on_map">Map</string>
+    <string name="apps_see_on_map_body">Where it goes</string>
+    <string name="report_tile_title">Grade %1$s</string>
+    <string name="apps_data_wifi">Wi-Fi · 30 days</string>
+    <string name="apps_data_mobile">Mobile · 30 days</string>
 </resources>
