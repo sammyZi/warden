@@ -137,7 +137,7 @@ def backdrop(w, h):
         for x in range(-R, R, 14):
             if x * x + y * y < R * R and rnd.random() < 0.55:
                 fade = 1 - math.hypot(x, y) / R
-                d.ellipse((cx + x - 1.6, cy + y - 1.6, cx + x + 1.6, cy + y + 1.6), fill=(255, 255, 255, int(38 * fade)))
+                d.ellipse((cx + x - 1.6, cy + y - 1.6, cx + x + 1.6, cy + y + 1.6), fill=(255, 255, 255, int(22 * fade)))
     bg.alpha_composite(dots)
     glow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     g = ImageDraw.Draw(glow)
@@ -149,34 +149,38 @@ def backdrop(w, h):
 
 
 def banner(raw):
+    """
+    Layout follows current app-store practice: the hero phone straight-on and large (readable even as
+    a small social preview), running off the bottom edge; one supporting phone behind it; a short,
+    big headline; a quiet backdrop so the app's own UI carries the colour.
+    """
     W, H = 1280, 640
     canvas = backdrop(W, H)
-    shots = {n: Image.open(raw / f"{n}.png").convert("RGB") for n in ("home", "map", "apps")}
+    shots = {n: Image.open(raw / f"{n}.png").convert("RGB") for n in ("home", "map")}
 
-    # Phones: Map and Apps angled behind, Home large in front.
-    place(canvas, device(shots["map"], 470), (850, 350), angle=9)
-    place(canvas, device(shots["apps"], 470), (1150, 350), angle=-9)
-    place(canvas, device(shots["home"], 560), (1000, 330), shadow=0.75)
+    # Map behind and to the left, a touch smaller and dimmer; Home in front, cut by the bottom edge.
+    back = device(shots["map"], 560)
+    dim = Image.new("RGBA", back.size, (14, 15, 13, 70))
+    back = Image.alpha_composite(back, Image.composite(dim, Image.new("RGBA", back.size, (0, 0, 0, 0)), back.split()[-1]))
+    place(canvas, back, (860, 390), shadow=0.5)
+    place(canvas, device(shots["home"], 640), (1065, 430), shadow=0.8)
 
-    # Callouts pinned near the phones.
-    callout(canvas, (548, 372), LIME, "Encrypted DNS", "Cloudflare · Quad9 · your own")
-    callout(canvas, (588, 466), VERMILION, "385 blocked today", "trackers and ads, per app")
+    callout(canvas, (600, 470), VERMILION, "385 blocked today", "trackers and ads, per app")
 
     d = ImageDraw.Draw(canvas)
     small = font("rubik.ttf", 20)
-    d.rounded_rectangle((72, 92, 72 + d.textlength("ANDROID FIREWALL", font=small) + 32, 128), 18, outline=LIME, width=2)
-    d.text((88, 99), "ANDROID FIREWALL", font=small, fill=LIME)
-    gradient_text(canvas, (68, 156), "Warden", font("pixelify_sans.ttf", 136))
-    body = font("rubik.ttf", 31)
-    d.text((74, 340), "See which apps talk to", font=body, fill=PAPER)
-    d.text((74, 380), "which servers. Block", font=body, fill=PAPER)
-    d.text((74, 420), "trackers per app.", font=body, fill=PAPER)
+    d.rounded_rectangle((72, 76, 72 + d.textlength("ANDROID FIREWALL", font=small) + 32, 112), 18, outline=LIME, width=2)
+    d.text((88, 83), "ANDROID FIREWALL", font=small, fill=LIME)
+    gradient_text(canvas, (66, 138), "Warden", font("pixelify_sans.ttf", 150))
+    d.text((72, 330), "See where your", font=font("rubik.ttf", 44), fill=PAPER)
+    d.text((72, 384), "apps really go.", font=font("rubik.ttf", 44), fill=PAPER)
+    d.text((74, 450), "Block trackers per app. No root.", font=font("rubik.ttf", 24), fill=MUTED)
     x = 74
     chip = font("rubik.ttf", 19)
-    for label in ["No root", "No accounts", "On-device", "Open source"]:
+    for label in ["On-device", "No accounts", "Open source"]:
         w = d.textlength(label, font=chip) + 30
-        d.rounded_rectangle((x, 500, x + w, 538), 19, fill=SURFACE, outline=OUTLINE, width=2)
-        d.text((x + 15, 508), label, font=chip, fill=MUTED)
+        d.rounded_rectangle((x, 520, x + w, 558), 19, fill=SURFACE, outline=OUTLINE, width=2)
+        d.text((x + 15, 528), label, font=chip, fill=MUTED)
         x += w + 10
     canvas.convert("RGB").save(OUT / "banner.png", optimize=True)
 
