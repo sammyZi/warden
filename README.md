@@ -1,14 +1,62 @@
 <p align="center"><img src="docs/banner.png" alt="Warden: a no-root Android firewall" width="100%"></p>
 
-# Warden
+<h1 align="center">Warden</h1>
 
-**See every server every app talks to. Block trackers per app. No root, no account, no cloud.**
+<p align="center">
+  A free, open-source firewall for Android that needs no root.<br>
+  See which apps talk to which servers, block any app or tracker. Everything stays on your phone.
+</p>
+
+<p align="center">
+  <a href="https://github.com/sammyZi/warden/releases/latest"><b>⬇️ Download the latest APK</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/sammyZi/warden/releases">All releases</a>
+  &nbsp;·&nbsp;
+  <a href="#privacy-promise">Privacy promise</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/sammyZi/warden/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/sammyZi/warden?include_prereleases&label=release&color=e05d44"></a>
+  <img alt="platform Android" src="https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white">
+  <img alt="minSdk 26" src="https://img.shields.io/badge/minSdk-26-555">
+  <img alt="Kotlin 2.4" src="https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white">
+  <img alt="Jetpack Compose" src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white">
+  <a href="LICENSE"><img alt="license GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-e05d44"></a>
+  <img alt="root not needed" src="https://img.shields.io/badge/root-not%20needed-1F6F5B">
+  <img alt="ads none" src="https://img.shields.io/badge/ads-none-1F6F5B">
+  <img alt="trackers none" src="https://img.shields.io/badge/trackers-none-1F6F5B">
+  <br>
+  <a href="https://github.com/sammyZi/warden/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/sammyZi/warden/total?color=e05d44"></a>
+</p>
 
 <!-- Demo GIF goes here: an app contacting trackers, then a blocked connection. -->
 
-Warden is an open-source firewall for Android. It uses Android's local VPN slot to watch each
-connection your apps make, shows where they go on a live globe, and blocks trackers per app.
-Everything happens on your phone.
+## Features
+
+**Block what you want**
+- **Cut any app off the internet**, separately on Wi-Fi and mobile data. Every installed app is listed, so you can block one before it ever connects.
+- **Block or allow single domains**, for one app or for every app, straight from the live log, the app's page or the map.
+- **Blocklists** for ads, trackers and malware (HaGeZi, StevenBlack, OISD), downloaded and refreshed on your phone.
+- **Skip Warden** for apps you trust, so their traffic doesn't go through it at all.
+- **No sneaking around it**: apps can't dodge your rules with their own DNS servers, DNS-over-HTTPS or DNS-over-TLS.
+
+**See what your apps do**
+- **Live log** of every lookup and connection, with the app, time, and whether it was blocked.
+- **Where it went**: a 3D globe of the countries your traffic reached, filtered by app, time span, blocked or trackers. CDN edges are labelled as such.
+- **Per-app pages**: connections, domains, trackers, recent activity, data used and a shortcut to that app on the map.
+- **Tracker companies**: "your apps contacted 26 trackers from 9 companies today", grouped by company and purpose.
+- **Privacy report cards**: an A–F grade per app with the working shown, shareable as an image.
+- **Data usage per app**, split by Wi-Fi and mobile, even while Warden is off (with Android's Usage access).
+- **30 days of history** stored on your phone, with Today / 7 days / 30 days views.
+
+**DNS and network**
+- **Encrypted DNS**: send lookups to Cloudflare, Quad9 or your own DNS-over-HTTPS server, so your Wi-Fi or carrier can't read them.
+- **Private DNS warning** when Android's own setting would bypass Warden, with a link to fix it.
+- **Survives network changes**, rebuilding itself when you move between IPv4-only and IPv6 networks.
+
+**Built to be light and private**
+- No account, no analytics, no ads, no cloud. Nothing about your traffic leaves the phone.
+- Screens pause their work in the background and history is written in batches, to keep battery use low.
 
 ## Screenshots
 
@@ -44,10 +92,12 @@ flowchart LR
 
 ## Privacy promise
 
-- No account, no analytics, no crash reporting, no cloud.
-- The only network calls Warden makes itself are blocklist downloads you switch on.
+- No account, no analytics, no crash reporting, no ads, no cloud.
+- Warden's own network calls are only the ones you switch on: blocklist downloads, and lookups to the
+  encrypted DNS server you pick.
 - Warden never decrypts HTTPS. It sees *where* apps connect (domain, IP, port), never *what* they send.
-- IP-to-country lookups use an offline database bundled in the app.
+- IP-to-country lookups use an offline database bundled in the app. History stays on the phone and can
+  be cleared from Settings.
 
 ## Honest limitations
 
@@ -92,11 +142,11 @@ Good first issues are listed in [docs/good-first-issues.md](docs/good-first-issu
 
 ## Roadmap
 
-- Room-backed history with batched writes and auto-pruning
-- Tracker-company mapping ("14 trackers from 6 companies")
-- Shareable privacy report cards with a documented A–F grade
-- DNS settings: upstream DoH, block response, DoH-bypass blocking
-- Scheduled rules, learning mode, PCAP export
+- Learning mode: suggestions like "Instagram contacted 3 trackers this week; block them?"
+- Screen-off blocking and new-app alerts
+- Quick Settings tile, home-screen widget and scheduled rules
+- Backup and restore of rules
+- Optional per-app Tor routing through Orbot
 
 ## License
 
