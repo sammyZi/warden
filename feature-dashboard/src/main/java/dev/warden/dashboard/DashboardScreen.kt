@@ -1,5 +1,6 @@
 package dev.warden.dashboard
 
+import dev.warden.design.ScreenTitle
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
@@ -113,11 +114,7 @@ fun DashboardScreen(
                 .padding(horizontal = Spacing.xl),
         ) {
             // Same header slot as every other tab.
-            Text(
-                stringResource(R.string.dashboard_title),
-                Modifier.padding(top = Spacing.s, bottom = Spacing.s),
-                style = Warden.type.headline,
-            )
+            ScreenTitle(stringResource(R.string.dashboard_title), Modifier.padding(top = Spacing.s, bottom = Spacing.s))
             Text(
                 stringResource(if (state == PowerState.On) R.string.dashboard_on_detail else R.string.dashboard_off_detail),
                 style = Warden.type.body,

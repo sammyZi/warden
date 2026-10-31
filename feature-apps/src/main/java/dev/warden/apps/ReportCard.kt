@@ -93,7 +93,7 @@ private const val TRACKER_WEIGHT = 30f
 private const val SCREEN_OFF_WEIGHT = 15f
 
 /** One app's last 7 days, graded. */
-internal class Report(val grade: Grade, val connections: Int, val blocked: Int, val companies: List<String>)
+internal class Report(val grade: Grade, val connections: Int, val blocked: Int, val companies: List<String>, val hasData: Boolean)
 
 @Composable
 internal fun rememberReport(uid: Int): Report {
@@ -112,6 +112,8 @@ internal fun rememberReport(uid: Int): Report {
         totals?.connections ?: 0,
         totals?.blocked ?: 0,
         trackers.byCompany.map { it.first },
+        // Nothing seen this week: no grade, rather than a perfect A for an app that simply hasn't run.
+        hasData = domains.isNotEmpty() || (totals?.let { it.connections + it.blocked } ?: 0) > 0,
     )
 }
 
@@ -198,6 +200,7 @@ internal fun GradeBadge(letter: String, size: androidx.compose.ui.unit.Dp, modif
     val fill = when (letter) {
         "A", "B" -> Color(0xFFD8F23C)
         "C" -> Color(0xFFF2BC45)
+        NO_GRADE -> Color(0xFF8D9692)
         else -> Color(0xFFFF6B4A)
     }
     Box(modifier.size(size).background(fill, CircleShape), contentAlignment = Alignment.Center) {
@@ -274,3 +277,6 @@ private suspend fun share(context: Context, bitmap: Bitmap, name: String) {
 }
 
 private const val MAX_LISTED = 5
+
+/** Shown in place of a letter when there's no traffic to grade. */
+internal const val NO_GRADE = "–"

@@ -40,6 +40,8 @@ import dev.warden.design.Spacing
 import dev.warden.design.Warden
 import dev.warden.rules.Dns
 import dev.warden.rules.Upstream
+import dev.warden.rules.isValidDohUrl
+import dev.warden.engine.Engine
 import dev.warden.design.R as DesignR
 
 /**
@@ -51,8 +53,9 @@ internal fun DnsCard(active: Boolean, onOpenSettings: () -> Unit) {
     val c = Warden.colors
     val config by Dns.config.collectAsState()
     var picking by rememberSaveable { mutableStateOf(false) }
-    // The choice only applies while protection is on; with it off the phone resolves on its own, unencrypted.
-    val encrypted = active && config.dohUrl != null
+    // What the engine actually managed, not just what's chosen: a server that failed to set up means plain DNS.
+    val engineEncrypted by Engine.dnsEncrypted.collectAsState()
+    val encrypted = active && engineEncrypted
     val hue = upstreamHue(config.upstream, config.dohUrl != null)
     val shape = RoundedCornerShape(Radii.medium)
 
@@ -83,7 +86,7 @@ internal fun DnsCard(active: Boolean, onOpenSettings: () -> Unit) {
         DnsSheet(config.upstream, onDismiss = { picking = false }) {
             picking = false
             // Typing a URL belongs on the settings page, not in a sheet.
-            if (it == Upstream.Custom && config.dohUrl == null) onOpenSettings() else Dns.setUpstream(it)
+            if (it == Upstream.Custom && !isValidDohUrl(config.customUrl)) onOpenSettings() else Dns.setUpstream(it)
         }
     }
 }

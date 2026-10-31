@@ -22,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -44,7 +43,7 @@ import kotlinx.coroutines.flow.first
 internal fun DataUsedCard(uid: Int) {
     val c = Warden.colors
     val context = LocalContext.current
-    val access = remember { SystemUsage.hasAccess(context) }
+    val access = SystemUsage.hasAccess(context) // cheap; picks up a grant made on the Data screen
     // One AppUsage per range; Wi-Fi/mobile are zero when only Warden's history is available.
     val usage by produceState<List<AppUsage>?>(null, uid, access) {
         value = Range.entries.map { range ->

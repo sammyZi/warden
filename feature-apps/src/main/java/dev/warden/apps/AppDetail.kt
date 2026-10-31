@@ -141,11 +141,15 @@ internal fun AppDetail(
             // Two quick ways out of the header: the report card, and this app's traffic on the globe.
             Row(Modifier.padding(horizontal = Spacing.xl), horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 ActionTile(
-                    stringResource(R.string.report_tile_title, report.grade.letter),
-                    stringResource(R.string.report_row_short),
+                    if (report.hasData) {
+                        stringResource(R.string.report_tile_title, report.grade.letter)
+                    } else {
+                        stringResource(R.string.report_tile_none)
+                    },
+                    stringResource(if (report.hasData) R.string.report_row_short else R.string.report_tile_none_body),
                     Modifier.weight(1f),
-                    lead = { GradeBadge(report.grade.letter, 36.dp) },
-                ) { showReport = true }
+                    lead = { GradeBadge(if (report.hasData) report.grade.letter else NO_GRADE, 36.dp) },
+                ) { if (report.hasData) showReport = true }
                 ActionTile(
                     stringResource(R.string.apps_see_on_map),
                     stringResource(R.string.apps_see_on_map_body),

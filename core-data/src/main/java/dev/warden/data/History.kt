@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flatMapLatest
@@ -105,37 +106,50 @@ object History {
     fun connectionsSince(since: Long, limit: Int = MAP_ROWS): Flow<List<NetEvent>> =
         dao.connectionsSince(since, limit).whileVisible().map { rows -> rows.map { it.toEvent() } }
 
-    fun stats(range: Range): Flow<RangeStats> = dao.stats(start(range)).whileVisible()
+    /**
+     * Re-runs [query] every minute: time ranges and bucket sizes are worked out when a query starts, so a
+     * screen left open would otherwise drop new events past the last bucket and keep a stale "today".
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun <T> ticking(query: () -> Flow<T>): Flow<T> =
+        flow {
+            while (true) {
+                emit(Unit)
+                delay(TICK_MS)
+            }
+        }.flatMapLatest { query() }
+
+    fun stats(range: Range): Flow<RangeStats> = ticking { dao.stats(start(range)) }.whileVisible()
 
     /** Event counts per bucket across [range], oldest first, zero-filled. */
-    fun activity(range: Range): Flow<List<Int>> {
+    fun activity(range: Range): Flow<List<Int>> = ticking {
         val since = start(range)
         val bucketMs = (System.currentTimeMillis() - since) / range.buckets + 1
-        return dao.activity(since, bucketMs).whileVisible().map { list ->
+        dao.activity(since, bucketMs).map { list ->
             val out = IntArray(range.buckets)
             list.forEach { if (it.bucket in 0 until range.buckets) out[it.bucket.toInt()] = it.count }
             out.toList()
         }
-    }
+    }.whileVisible()
 
     /** Bytes moved per bucket across [range], oldest first, zero-filled. */
-    fun traffic(range: Range): Flow<List<Long>> {
+    fun traffic(range: Range): Flow<List<Long>> = ticking {
         val since = start(range)
         val bucketMs = (System.currentTimeMillis() - since) / range.buckets + 1
-        return dao.traffic(since, bucketMs).whileVisible().map { list ->
+        dao.traffic(since, bucketMs).map { list ->
             val out = LongArray(range.buckets)
             list.forEach { if (it.bucket in 0 until range.buckets) out[it.bucket.toInt()] = it.bytes }
             out.toList()
         }
-    }
+    }.whileVisible()
 
     fun apps(range: Range, screenOffOnly: Boolean = false, limit: Int = 50): Flow<List<AppTotals>> =
-        dao.apps(start(range), screenOffOnly, limit).whileVisible()
+        ticking { dao.apps(start(range), screenOffOnly, limit) }.whileVisible()
 
-    fun appDomains(uid: Int, range: Range): Flow<List<DomainCount>> = dao.appDomains(uid, start(range)).whileVisible()
+    fun appDomains(uid: Int, range: Range): Flow<List<DomainCount>> = ticking { dao.appDomains(uid, start(range)) }.whileVisible()
 
     /** Every distinct domain contacted in [range] (for tracker summaries). */
-    fun domains(range: Range): Flow<List<String>> = dao.domains(start(range)).whileVisible()
+    fun domains(range: Range): Flow<List<String>> = ticking { dao.domains(start(range)) }.whileVisible()
 
     /** Start of [range]: midnight today, or N days back. */
     fun start(range: Range): Long = when (range) {
@@ -160,6 +174,7 @@ object History {
     )
 
     private const val FLUSH_MS = 1_500L
+    private const val TICK_MS = 60_000L
     private const val FLUSH_SCREEN_OFF_MS = 30_000L
     private const val FLUSH_IDLE_MS = 10_000L
     private const val PRUNE_EVERY_MS = 3_600_000L

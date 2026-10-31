@@ -1,5 +1,6 @@
 package dev.warden.map
 
+import dev.warden.design.ScreenTitle
 import android.content.Context
 import android.telephony.TelephonyManager
 import androidx.activity.compose.BackHandler
@@ -220,7 +221,7 @@ private fun Overview(
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
         item {
             Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.s)) {
-                Text(stringResource(R.string.map_title_sans), style = Warden.type.headline)
+                ScreenTitle(stringResource(R.string.map_title_sans))
             }
         }
         item { filter() }

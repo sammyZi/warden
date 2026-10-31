@@ -29,3 +29,10 @@ Every dependency, dataset and asset is checked before use. "Checked" = date the 
 ## Still to verify before use
 
 Exodus Privacy tracker data, Disconnect list, StevenBlack / HaGeZi / OISD blocklists, dnsjava, hev-socks5-tunnel (fallback engine only), Vico, PCAPdroid license.
+
+## Pixelify Sans (font)
+
+- Source: https://github.com/google/fonts/tree/main/ofl/pixelifysans (Pixelify Sans Project Authors)
+- License: SIL Open Font License 1.1. Bundled as `core-design/src/main/res/font/pixelify_sans.ttf`;
+  used for screen titles and a few highlighted words. The OFL allows bundling in an app; the font
+  may not be sold on its own.

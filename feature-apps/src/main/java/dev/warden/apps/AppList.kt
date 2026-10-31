@@ -1,5 +1,6 @@
 package dev.warden.apps
 
+import dev.warden.design.ScreenTitle
 import android.Manifest
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
@@ -62,8 +63,9 @@ import kotlinx.coroutines.withContext
 import dev.warden.design.R as DesignR
 
 /** One row: an installed app (or a UID seen in traffic), with what it did recently. */
-private class AppRow(val uid: Int, val packages: List<String>, val connections: Int, val domains: Int, val blocked: Int) {
-    val active get() = connections + blocked > 0
+private class AppRow(val uid: Int, val packages: List<String>, val connections: Int, val domains: Int, val blocked: Int, val events: Int) {
+    // Lookups count: an app that only resolved names has still been active.
+    val active get() = events > 0
 }
 
 private enum class AppsFilter { Active, All, Ruled }
@@ -85,7 +87,10 @@ internal fun AppList(
     val c = Warden.colors
     val context = LocalContext.current
     val installed by produceState(emptyMap<Int, List<String>>()) {
-        value = withContext(Dispatchers.IO) { internetApps(context.packageManager) }
+        value = withContext(Dispatchers.IO) {
+            // Names are looked up here, off the main thread, so the first scroll through All apps doesn't stutter.
+            internetApps(context.packageManager).also { apps -> apps.keys.forEach { appLabel(it) } }
+        }
     }
     val rules by AppRules.rules.collectAsState()
     val excluded by AppRules.excluded.collectAsState()
@@ -94,7 +99,8 @@ internal fun AppList(
 
     val all = remember(events, installed) {
         val seen = events.groupBy { it.uid }
-        (installed.keys + seen.keys).map { uid ->
+        // Warden's own lookups are recorded too; it isn't one of "your apps".
+        (installed.keys + seen.keys - Process.myUid()).map { uid ->
             val list = seen[uid].orEmpty()
             AppRow(
                 uid = uid,
@@ -102,6 +108,7 @@ internal fun AppList(
                 connections = list.count { it.kind != "dns" },
                 domains = list.mapNotNull { it.domain }.distinct().size,
                 blocked = list.count { it.blocked },
+                events = list.size,
             )
         }
     }
@@ -113,78 +120,92 @@ internal fun AppList(
                 AppsFilter.All -> true
                 AppsFilter.Ruled -> ruled
             } && (query.isBlank() || appLabel(a.uid).contains(query.trim(), ignoreCase = true))
-        }.sortedWith(compareByDescending<AppRow> { it.connections + it.blocked }.thenBy { appLabel(it.uid).lowercase() })
+        }.sortedWith(
+            // All apps reads A to Z; the other views put the busiest first.
+            if (filter == AppsFilter.All) {
+                compareBy { appLabel(it.uid).lowercase() }
+            } else {
+                compareByDescending<AppRow> { it.connections + it.blocked }.thenBy { appLabel(it.uid).lowercase() }
+            },
+        )
     }
+    val alphabetical = filter == AppsFilter.All && query.isBlank() && shown.isNotEmpty()
     val most = shown.maxOfOrNull { it.connections }?.coerceAtLeast(1) ?: 1
 
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        state = listState,
-        contentPadding = PaddingValues(top = Spacing.s, bottom = Spacing.l),
-    ) {
-        item {
-            Column(Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.m)) {
-                Text(stringResource(R.string.apps_title), style = Warden.type.headline)
-                Text(
-                    pluralStringResource(R.plurals.apps_summary_all, all.size, all.size),
-                    style = Warden.type.body.tabular(),
-                    color = c.muted,
-                )
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(top = Spacing.s, bottom = Spacing.l, end = if (alphabetical) INDEX_WIDTH else 0.dp),
+        ) {
+            item {
+                Column(Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.m)) {
+                    ScreenTitle(stringResource(R.string.apps_title))
+                    Text(
+                        pluralStringResource(R.plurals.apps_summary_all, all.size, all.size),
+                        style = Warden.type.body.tabular(),
+                        color = c.muted,
+                    )
+                }
             }
-        }
-        item { SearchField(query) { query = it } }
-        item {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = Spacing.xl),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-                modifier = Modifier.padding(vertical = Spacing.m),
-            ) {
-                AppsFilter.entries.forEach { f ->
-                    item {
-                        FilterChip(
-                            stringResource(
-                                when (f) {
-                                    AppsFilter.Active -> R.string.apps_filter_active
-                                    AppsFilter.All -> R.string.apps_filter_all
-                                    AppsFilter.Ruled -> R.string.apps_filter_ruled
-                                },
-                            ),
-                            filter == f,
-                            { filter = f },
-                        )
+            item { SearchField(query) { query = it } }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = Spacing.xl),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+                    modifier = Modifier.padding(vertical = Spacing.m),
+                ) {
+                    AppsFilter.entries.forEach { f ->
+                        item {
+                            FilterChip(
+                                stringResource(
+                                    when (f) {
+                                        AppsFilter.Active -> R.string.apps_filter_active
+                                        AppsFilter.All -> R.string.apps_filter_all
+                                        AppsFilter.Ruled -> R.string.apps_filter_ruled
+                                    },
+                                ),
+                                filter == f,
+                                { filter = f },
+                            )
+                        }
                     }
                 }
             }
-        }
-        if (shown.isEmpty()) {
-            item {
-                // Nothing active yet reads as "turn Warden on"; a search or filter with no hits says so instead.
-                val idle = filter == AppsFilter.Active && query.isBlank()
-                EmptyState(
-                    DesignR.drawable.ph_squares_four_light,
-                    stringResource(if (idle) R.string.apps_empty_title else R.string.apps_none_match),
-                    stringResource(if (idle) R.string.apps_empty_body else R.string.apps_none_match_body),
-                    Modifier.fillMaxWidth().padding(top = Spacing.xl),
-                )
+            if (shown.isEmpty()) {
+                item {
+                    // Nothing active yet reads as "turn Warden on"; a search or filter with no hits says so instead.
+                    val idle = filter == AppsFilter.Active && query.isBlank()
+                    EmptyState(
+                        DesignR.drawable.ph_squares_four_light,
+                        stringResource(if (idle) R.string.apps_empty_title else R.string.apps_none_match),
+                        stringResource(if (idle) R.string.apps_empty_body else R.string.apps_none_match_body),
+                        Modifier.fillMaxWidth().padding(top = Spacing.xl),
+                    )
+                }
             }
+            // One panel with thin dividers rather than a stack of separate cards.
+            itemsIndexed(shown, key = { _, a -> a.uid }) { index, a ->
+                AppListRow(
+                    a,
+                    appLabel,
+                    appIcon,
+                    shared,
+                    rules[a.uid],
+                    a.packages.any { it in excluded },
+                    if (a.active) a.connections / most.toFloat() else null,
+                    c.palette[index % c.palette.size],
+                    first = index == 0,
+                    last = index == shown.lastIndex,
+                    modifier = Modifier.staggerIn(index, firstAppearance),
+                ) { onOpen(a.uid) }
+            }
+            item { BarSpacer() }
         }
-        // One panel with thin dividers rather than a stack of separate cards.
-        itemsIndexed(shown, key = { _, a -> a.uid }) { index, a ->
-            AppListRow(
-                a,
-                appLabel,
-                appIcon,
-                shared,
-                rules[a.uid],
-                a.packages.any { it in excluded },
-                if (a.active) a.connections / most.toFloat() else null,
-                c.palette[index % c.palette.size],
-                first = index == 0,
-                last = index == shown.lastIndex,
-                modifier = Modifier.staggerIn(index, firstAppearance),
-            ) { onOpen(a.uid) }
+        if (alphabetical) {
+            // Rows start after the title, search and filter items.
+            AlphabetIndex(shown.map { appLabel(it.uid) }, listState, firstRow = HEADER_ITEMS, Modifier.align(Alignment.CenterEnd))
         }
-        item { BarSpacer() }
     }
 }
 
@@ -312,9 +333,14 @@ private fun internetApps(pm: PackageManager): Map<Int, List<String>> {
     return packages
         .filter { p ->
             val uid = p.applicationInfo?.uid ?: return@filter false
-            uid != Process.myUid() && p.requestedPermissions?.contains(Manifest.permission.INTERNET) == true &&
+            // System UIDs (shared by Settings and other built-ins) already show as one "Android system" row.
+            uid >= Process.FIRST_APPLICATION_UID && uid != Process.myUid() &&
+                p.requestedPermissions?.contains(Manifest.permission.INTERNET) == true &&
                 // System services without a launcher icon are noise here; they still show once they connect.
                 pm.getLaunchIntentForPackage(p.packageName) != null
         }
         .groupBy({ it.applicationInfo!!.uid }, { it.packageName })
 }
+
+private val INDEX_WIDTH = 24.dp
+private const val HEADER_ITEMS = 3

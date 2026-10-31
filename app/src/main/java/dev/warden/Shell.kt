@@ -123,6 +123,12 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
     var returnTo by rememberSaveable { mutableStateOf<Tab?>(null) }
     // An app to show on the Map, handed over from its detail screen; the Map clears it once applied.
     var mapFocus by rememberSaveable { mutableStateOf<Int?>(null) }
+    // Set when the Map was opened from an app's detail, so Back goes back to that app.
+    var mapFromApp by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = tab == Tab.Map && mapFromApp) {
+        mapFromApp = false
+        tab = Tab.Apps
+    }
     val openFrom: (Int) -> Unit = {
         openApp = it
         returnTo = tab
@@ -185,6 +191,7 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
                             }
                         }, onShowOnMap = {
                             mapFocus = it
+                            mapFromApp = true
                             tab = Tab.Map
                         })
                         Tab.Map -> MapScreen(
@@ -214,6 +221,7 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
         ) {
             if (it == Tab.Apps && tab == Tab.Apps) openApp = null // re-tap the tab to get back to the list
             returnTo = null
+            mapFromApp = false
             tab = it
         }
     }
@@ -348,7 +356,7 @@ internal class AppInfo(private val pm: PackageManager, context: Context) {
     private val unknown = context.getString(R.string.uid_unknown)
     private val system = context.getString(R.string.uid_system)
     private val iconPx = (40 * context.resources.displayMetrics.density).toInt()
-    private val labels = HashMap<Int, String>()
+    private val labels = java.util.concurrent.ConcurrentHashMap<Int, String>()
     private val icons = mutableStateMapOf<Int, ImageBitmap?>()
     private val loading = HashSet<Int>() // main thread only
     private val scope = MainScope()

@@ -43,6 +43,15 @@ object Engine {
 
     internal fun setRunning(on: Boolean) = _running.update { on }
 
+    private val _dnsEncrypted = MutableStateFlow(false)
+
+    /** True while allowed lookups really go to an encrypted (DoH) server, not just when one is chosen. */
+    val dnsEncrypted: StateFlow<Boolean> = _dnsEncrypted.asStateFlow()
+
+    internal fun setDnsEncrypted(on: Boolean) {
+        _dnsEncrypted.value = on
+    }
+
     /** Blocked flows and lookups since the tunnel started, for the notification. */
     internal val blocked = AtomicInteger()
 

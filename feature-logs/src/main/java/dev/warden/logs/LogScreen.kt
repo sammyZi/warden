@@ -1,5 +1,6 @@
 package dev.warden.logs
 
+import dev.warden.design.ScreenTitle
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -91,7 +92,7 @@ fun LogScreen(
     // Title, live line and filters stay put; only the stream below scrolls.
     Column(modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.s)) {
-            Text(stringResource(R.string.log_title), style = Warden.type.headline)
+            ScreenTitle(stringResource(R.string.log_title))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 LiveDot(running)
                 Text(

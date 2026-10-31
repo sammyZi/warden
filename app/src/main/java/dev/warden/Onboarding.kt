@@ -1,5 +1,6 @@
 package dev.warden
 
+import dev.warden.design.highlighted
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -120,7 +121,7 @@ internal fun Onboarding(onDone: () -> Unit) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
                 OnboardingHero(s, Modifier.fillMaxWidth().height(300.dp))
                 Spacer(Modifier.height(Spacing.xxl))
-                Text(stringResource(s.title), style = Warden.type.headline)
+                Text(highlighted(stringResource(s.title)), style = Warden.type.headline)
                 Spacer(Modifier.height(Spacing.m))
                 Text(
                     if (s == Step.Battery) {

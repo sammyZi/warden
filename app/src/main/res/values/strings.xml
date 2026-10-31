@@ -10,17 +10,17 @@
     <string name="uid_unknown">Unknown or system</string>
     <string name="uid_system">Android system</string>
 
-    <string name="onb_local_title">A firewall that lives on your phone</string>
+    <string name="onb_local_title">A firewall that lives on *your phone*</string>
     <string name="onb_local_body">Warden uses Android\'s VPN slot to see each connection your apps make. It\'s a local VPN: your traffic never goes to a server of ours, because there isn\'t one.</string>
-    <string name="onb_private_title">Nothing leaves your phone</string>
+    <string name="onb_private_title">*Nothing* leaves your phone</string>
     <string name="onb_private_body">No account, no analytics, no cloud. The only downloads are blocklists you choose, and you can switch those off.</string>
-    <string name="onb_tls_title">Where, never what</string>
+    <string name="onb_tls_title">*Where*, never what</string>
     <string name="onb_tls_body">Warden reads destinations, like graph.facebook.com. It never decrypts HTTPS, so your messages and passwords stay sealed.</string>
-    <string name="onb_vpn_title">Allow the local VPN</string>
+    <string name="onb_vpn_title">Allow the *local VPN*</string>
     <string name="onb_vpn_body">Android asks once. Only one VPN app can run at a time, so Warden can\'t run alongside another VPN.</string>
-    <string name="onb_notif_title">One quiet notification</string>
+    <string name="onb_notif_title">One *quiet* notification</string>
     <string name="onb_notif_body">Android requires it while Warden runs. It shows what\'s been blocked and has a Stop button.</string>
-    <string name="onb_battery_title">Keep Warden running</string>
+    <string name="onb_battery_title">Keep Warden *running*</string>
     <string name="onb_battery_body">Some phones, including %1$s, stop background apps to save battery. In App info, open Battery and choose Unrestricted so protection doesn\'t quietly switch off.</string>
 
     <string name="onb_blocked">Blocked</string>

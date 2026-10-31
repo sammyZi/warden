@@ -1,5 +1,6 @@
 package dev.warden.settings
 
+import dev.warden.design.ScreenTitle
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -127,11 +128,7 @@ private fun SettingsHome(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.s),
     ) {
-        Text(
-            stringResource(R.string.settings_title_sans),
-            Modifier.padding(top = Spacing.s, bottom = Spacing.m),
-            style = Warden.type.headline,
-        )
+        ScreenTitle(stringResource(R.string.settings_title_sans), Modifier.padding(top = Spacing.s, bottom = Spacing.m))
 
         // Rules overview first: it's what people come here for.
         Tile(Modifier.fillMaxWidth(), onClick = onOpenRules) {

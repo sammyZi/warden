@@ -111,6 +111,7 @@ class WardenVpnService : VpnService(), Bridge {
             // Foreground first: if connect() fails we can still stop cleanly instead of
             // tripping ForegroundServiceDidNotStartInTimeException.
             goForeground()
+            Engine.blocked.set(0) // a fresh start; rebuilds (DNS change, skipped apps) keep the count
             try {
                 connect()
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) { // firestack throws plain Exception
@@ -173,7 +174,6 @@ class WardenVpnService : VpnService(), Bridge {
         }
         // The notification's blocked count: redrawn at most every 10s, and not at all while the screen is
         // off (nobody sees it then; each redraw costs System UI work).
-        Engine.blocked.set(0)
         counter = CoroutineScope(Dispatchers.Default).launch {
             val power = getSystemService(PowerManager::class.java)
             var shown = 0
@@ -219,6 +219,7 @@ class WardenVpnService : VpnService(), Bridge {
             Intra.addDoHTransport(t, Backend.Preferred, url, config.upstream.bootstrap)
         }.onFailure { Log.w(TAG, "doh upstream $url", it) }.isSuccess
         dnsTransport = if (dohActive) Backend.Preferred else systemTransport
+        Engine.setDnsEncrypted(dohActive)
         Log.i(TAG, "dns via ${if (dohActive) url else "phone"}")
     }
 
@@ -247,6 +248,7 @@ class WardenVpnService : VpnService(), Bridge {
     private fun shutdown() {
         teardown()
         Engine.setRunning(false)
+        Engine.setDnsEncrypted(false)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }

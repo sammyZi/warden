@@ -123,4 +123,6 @@
     <string name="report_tile_title">Grade %1$s</string>
     <string name="apps_data_wifi">Wi-Fi · 30 days</string>
     <string name="apps_data_mobile">Mobile · 30 days</string>
+    <string name="report_tile_none">No grade</string>
+    <string name="report_tile_none_body">No traffic yet</string>
 </resources>

@@ -155,8 +155,8 @@ internal fun ToolScreen(
     // Data comes from Android's counters when Usage access is on (works with Warden off), else Warden's own history.
     val (access, requestAccess) = rememberUsageAccess()
     val system = systemApps(range, access)
-    val usage = if (access) system.orEmpty() else d.all.asUsage()
-    val rows = remember(tool, d, usage) { rows(tool, usage) }
+    val usage = remember(access, system, d.all) { if (access) system.orEmpty() else d.all.asUsage() }
+    val rows = remember(tool, usage) { rows(tool, usage) }
     val most = rows.maxOfOrNull { it.value }?.coerceAtLeast(1f) ?: 1f
 
     LazyColumn(
