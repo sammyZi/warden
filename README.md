@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/banner.png" alt="Warden: a no-root Android firewall" width="100%"></p>
+
 # Warden
 
 **See every server every app talks to. Block trackers per app. No root, no account, no cloud.**
@@ -10,7 +12,15 @@ Everything happens on your phone.
 
 ## Screenshots
 
-<!-- Home · Apps · App detail · Globe · Live log · Settings -->
+| Home | Apps | App detail |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/home.png" width="240" alt="Home: protection, DNS, today's stats and tools"> | <img src="docs/screenshots/apps.png" width="240" alt="Apps: search, filters and every app's activity"> | <img src="docs/screenshots/detail.png" width="240" alt="App detail: grade, map, stats, data and access"> |
+| **Where it went** | **Live log** | **Data** |
+| <img src="docs/screenshots/map.png" width="240" alt="Globe of where traffic went, by country"> | <img src="docs/screenshots/log.png" width="240" alt="Live log of lookups and connections"> | <img src="docs/screenshots/data.png" width="240" alt="Data used per app, Wi-Fi and mobile"> |
+| **Trackers** | **Report card** | **Settings** |
+| <img src="docs/screenshots/trackers.png" width="240" alt="Tracking companies and their domains"> | <img src="docs/screenshots/report.png" width="240" alt="Shareable privacy report card"> | <img src="docs/screenshots/settings.png" width="240" alt="Settings: rules, blocklists, DNS"> |
+
+The banner and these images are generated from real device captures by `tools/banner/make_banner.py`.
 
 ## How it works
 

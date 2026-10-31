@@ -71,8 +71,8 @@
     <string name="report_formula">How the grade works</string>
     <string name="report_kicker">Privacy report · last 7 days</string>
     <plurals name="report_connections">
-        <item quantity="one">connection</item>
-        <item quantity="other">connections</item>
+        <item quantity="one">connect</item>
+        <item quantity="other">connects</item>
     </plurals>
     <plurals name="report_companies">
         <item quantity="one">tracker company</item>
