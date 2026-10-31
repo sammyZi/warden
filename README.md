@@ -68,8 +68,6 @@
 | **Trackers** | **Report card** | **Settings** |
 | <img src="docs/screenshots/trackers.png" width="240" alt="Tracking companies and their domains"> | <img src="docs/screenshots/report.png" width="240" alt="Shareable privacy report card"> | <img src="docs/screenshots/settings.png" width="240" alt="Settings: rules, blocklists, DNS"> |
 
-The banner and these images are generated from real device captures by `tools/banner/make_banner.py`.
-
 ## How it works
 
 ```mermaid

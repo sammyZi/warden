@@ -11,8 +11,19 @@ android {
         applicationId = "dev.warden"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.compileSdk.get().toInt()
-        versionCode = 2
-        versionName = "0.1.0-m1"
+        versionCode = 3
+        versionName = "0.2.0"
+    }
+
+    // One APK per CPU type keeps downloads small (the engine's native library is ~20 MB per type),
+    // plus a universal APK for anyone unsure which to pick.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = true
+        }
     }
 
     // Real release signing comes from the environment (CI secrets); locally it falls back to the debug key.
