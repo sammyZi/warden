@@ -110,6 +110,15 @@ object Routing {
         _wireGuard.value = server?.config
     }
 
+    /** A blank name falls back to the server's address, as when it was added. */
+    fun renameServer(id: String, name: String) {
+        val label = name.trim()
+        prefs.edit().putString(NAME + id, label).apply()
+        _servers.value = _servers.value.map {
+            if (it.id == id) VpnServer(id, label.ifEmpty { it.config.endpoint }, it.config) else it
+        }
+    }
+
     fun removeServer(id: String) {
         prefs.edit().remove(CONF + id).remove(NAME + id).apply()
         _servers.value = _servers.value.filterNot { it.id == id }

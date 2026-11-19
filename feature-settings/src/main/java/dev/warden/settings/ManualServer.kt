@@ -72,7 +72,7 @@ internal fun ManualServerDialog(onDone: () -> Unit) {
 }
 
 @Composable
-private fun Field(label: Int, value: String, onChange: (String) -> Unit, hint: Int, secret: Boolean = false) {
+internal fun Field(label: Int, value: String, onChange: (String) -> Unit, hint: Int, secret: Boolean = false) {
     val c = Warden.colors
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Text(stringResource(label), style = Warden.type.label, color = c.muted)

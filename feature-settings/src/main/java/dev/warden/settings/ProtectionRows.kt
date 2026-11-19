@@ -1,6 +1,10 @@
 package dev.warden.settings
 
 import android.net.Uri
+import dev.warden.rules.VpnServer
+import androidx.compose.runtime.remember
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
@@ -102,6 +106,7 @@ internal fun WireGuardRow() {
     val selected by Routing.selected.collectAsState()
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var removing by rememberSaveable { mutableStateOf<String?>(null) }
+    var renaming by rememberSaveable { mutableStateOf<String?>(null) }
     val badFile = stringResource(R.string.wg_unreadable)
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -158,7 +163,7 @@ internal fun WireGuardRow() {
                 Text(server.name, style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(server.config.endpoint, style = Warden.type.label, color = c.muted, maxLines = 1)
             }
-            WardenButton(stringResource(R.string.wg_remove), { removing = server.id }, kind = ButtonKind.Text)
+            ServerMenu(server.name, onRename = { renaming = server.id }, onDelete = { removing = server.id })
         }
     }
     if (servers.isNotEmpty()) {
@@ -188,6 +193,7 @@ internal fun WireGuardRow() {
             onDismiss = { scanning = false },
         )
     }
+    servers.firstOrNull { it.id == renaming }?.let { server -> RenameDialog(server) { renaming = null } }
     servers.firstOrNull { it.id == removing }?.let { server ->
         AlertDialog(
             onDismissRequest = { removing = null },
@@ -212,3 +218,58 @@ private fun displayName(context: Context, uri: Uri): String = runCatching {
         if (it.moveToFirst()) it.getString(0) else null
     }
 }.getOrNull().orEmpty()
+
+/** ⋮ on a saved server: rename it or delete it. */
+@Composable
+private fun ServerMenu(name: String, onRename: () -> Unit, onDelete: () -> Unit) {
+    val c = Warden.colors
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Box(
+            Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button) { open = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(DesignR.drawable.ph_dots_three_vertical),
+                stringResource(R.string.wg_menu_for, name),
+                Modifier.size(20.dp),
+                tint = c.muted,
+            )
+        }
+        DropdownMenu(open, { open = false }, containerColor = c.surface) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.wg_rename), style = Warden.type.body) },
+                onClick = {
+                    open = false
+                    onRename()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.wg_delete), style = Warden.type.body, color = c.blocked) },
+                onClick = {
+                    open = false
+                    onDelete()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RenameDialog(server: VpnServer, onDone: () -> Unit) {
+    val c = Warden.colors
+    var name by rememberSaveable(server.id) { mutableStateOf(server.name) }
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text(stringResource(R.string.wg_rename), style = Warden.type.title) },
+        text = { Field(R.string.wg_f_name, name, { name = it }, R.string.wg_f_name_hint) },
+        confirmButton = {
+            WardenButton(stringResource(R.string.wg_rename_save), {
+                Routing.renameServer(server.id, name)
+                onDone()
+            })
+        },
+        dismissButton = { WardenButton(stringResource(R.string.settings_cancel), onDone, kind = ButtonKind.Text) },
+        containerColor = c.surface,
+    )
+}

@@ -109,8 +109,12 @@
     <string name="wg_f_endpoint_hint">vpn.example.com:51820</string>
     <string name="wg_f_psk">Preshared key (optional)</string>
     <string name="wg_f_optional">Leave empty if not given</string>
-    <string name="wg_remove">Remove</string>
-    <string name="wg_remove_title">Remove %1$s?</string>
+    <string name="wg_remove">Delete</string>
+    <string name="wg_remove_title">Delete %1$s?</string>
+    <string name="wg_menu_for">Options for %1$s</string>
+    <string name="wg_rename">Rename</string>
+    <string name="wg_rename_save">Save</string>
+    <string name="wg_delete">Delete</string>
     <string name="wg_remove_body">Deletes its key from this phone.</string>
     <string name="wg_error">Couldn\'t use it: %1$s</string>
     <string name="wg_unreadable">couldn\'t read it</string>
