@@ -27,6 +27,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -49,7 +53,7 @@ import dev.warden.design.R as DesignR
  * lookups are private right now. Tapping opens a sheet to switch. Custom URLs are entered in Settings.
  */
 @Composable
-internal fun DnsCard(active: Boolean, onOpenSettings: () -> Unit) {
+internal fun DnsCard(active: Boolean, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
     val c = Warden.colors
     val config by Dns.config.collectAsState()
     var picking by rememberSaveable { mutableStateOf(false) }
@@ -60,25 +64,33 @@ internal fun DnsCard(active: Boolean, onOpenSettings: () -> Unit) {
     val shape = RoundedCornerShape(Radii.medium)
 
     Row(
-        Modifier
-            .fillMaxWidth()
+        modifier
             .clip(shape)
             .background(c.surface)
-            .border(1.dp, c.outline, shape)
             .clickable(role = Role.Button) { picking = true }
             .padding(Spacing.m),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
         ProviderBadge(config.upstream, if (active) hue else c.muted, 44.dp)
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.dns_card_overline).uppercase(), style = Warden.type.caption, color = c.muted)
-            Text(upstreamName(config.upstream), style = Warden.type.title, maxLines = 1)
+        // The status rides on the overline ("DNS · ENCRYPTED") so the name keeps the card's width.
+        val (status, statusColor) = when {
+            !active -> stringResource(R.string.dns_pill_off) to c.muted
+            encrypted -> stringResource(R.string.dns_tag_encrypted) to hue
+            else -> stringResource(R.string.dns_tag_plain) to c.warning
         }
-        when {
-            !active -> Pill(stringResource(R.string.dns_pill_off), c.muted, null)
-            encrypted -> Pill(stringResource(R.string.dns_tag_encrypted), hue, DesignR.drawable.ph_lock_key_light)
-            else -> Pill(stringResource(R.string.dns_tag_plain), c.warning, null)
+        Column(Modifier.weight(1f)) {
+            Text(
+                buildAnnotatedString {
+                    append(stringResource(R.string.dns_card_overline).uppercase())
+                    append(" · ")
+                    withStyle(SpanStyle(color = statusColor)) { append(status.uppercase()) }
+                },
+                style = Warden.type.caption,
+                color = c.muted,
+                maxLines = 1,
+            )
+            Text(upstreamName(config.upstream), style = Warden.type.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 
@@ -119,7 +131,6 @@ private fun Option(option: Upstream, selected: Boolean, onClick: () -> Unit) {
             .heightIn(min = 72.dp)
             .clip(shape)
             .background(if (selected) hue.copy(alpha = if (c.isDark) 0.18f else 0.10f) else c.surface)
-            .border(if (selected) 2.dp else 1.dp, if (selected) hue else c.outline, shape)
             .clickable(role = Role.RadioButton, onClick = onClick)
             .padding(Spacing.m),
         verticalAlignment = Alignment.CenterVertically,
@@ -144,33 +155,20 @@ private fun Option(option: Upstream, selected: Boolean, onClick: () -> Unit) {
 /** Monogram for the public resolvers, an icon for the phone's own network and a custom server. */
 @Composable
 private fun ProviderBadge(u: Upstream, hue: Color, size: Dp) {
-    Box(Modifier.size(size).background(hue.copy(alpha = 0.18f), CircleShape), contentAlignment = Alignment.Center) {
-        when (u) {
-            Upstream.Cloudflare, Upstream.Quad9 -> Text(
-                if (u == Upstream.Cloudflare) "CF" else "Q9",
-                style = Warden.type.label.copy(fontWeight = FontWeight.SemiBold),
-                color = hue,
-            )
-            Upstream.Phone -> Icon(painterResource(DesignR.drawable.ph_wifi_high), null, Modifier.size(size / 2), tint = hue)
-            Upstream.Custom -> Icon(painterResource(DesignR.drawable.ph_gear_six), null, Modifier.size(size / 2), tint = hue)
-        }
+    // Cloudflare and Quad9 show their own logo in their brand colour (Simple Icons, CC0); the rest use our icons.
+    val (icon, tint) = when (u) {
+        Upstream.Cloudflare -> DesignR.drawable.logo_cloudflare to CLOUDFLARE_ORANGE
+        Upstream.Quad9 -> DesignR.drawable.logo_quad9 to QUAD9_PINK
+        Upstream.Phone -> DesignR.drawable.ph_wifi_high to hue
+        Upstream.Custom -> DesignR.drawable.ph_gear_six to hue
+    }
+    Box(Modifier.size(size).background(tint.copy(alpha = 0.16f), CircleShape), contentAlignment = Alignment.Center) {
+        Icon(painterResource(icon), null, Modifier.size(size * 0.55f), tint = tint)
     }
 }
 
-@Composable
-private fun Pill(text: String, hue: Color, icon: Int?) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(hue.copy(alpha = 0.16f))
-            .padding(horizontal = Spacing.m, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        if (icon != null) Icon(painterResource(icon), null, Modifier.size(14.dp), tint = hue)
-        Text(text, style = Warden.type.label.copy(fontWeight = FontWeight.Medium), color = hue)
-    }
-}
+private val CLOUDFLARE_ORANGE = Color(0xFFF38020)
+private val QUAD9_PINK = Color(0xFFDC205E)
 
 @Composable
 private fun Tag(text: String, hue: Color) {

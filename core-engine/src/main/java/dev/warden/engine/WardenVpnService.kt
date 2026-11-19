@@ -32,11 +32,15 @@ import com.celzero.firestack.intra.Tunnel
 import com.celzero.firestack.settings.Settings
 import dev.warden.rules.AppRules
 import dev.warden.rules.Dns
+import dev.warden.rules.Route
+import dev.warden.rules.Routing
 import dev.warden.rules.Rules
+import dev.warden.rules.WireGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -54,12 +58,27 @@ class WardenVpnService : VpnService(), Bridge {
     private var counter: Job? = null
     private var resets: Job? = null
     private var restarts: Job? = null
+    private var tor: Job? = null
+    private var detours: Job? = null
 
     @Volatile private var dnsTransport = Backend.Default
 
     @Volatile private var systemTransport = Backend.Default
 
     @Volatile private var dohActive = false
+
+    // Detours for apps routed through Tor or the user's WireGuard: set up only while some app uses them.
+    // A null proxy means it isn't up, and those apps fail closed. The DNS id is null if lookups can't go
+    // through it: Tor apps' lookups are then refused, WireGuard apps' go to the normal resolver.
+    @Volatile private var torProxy: String? = null
+
+    @Volatile private var torDns: String? = null
+
+    @Volatile private var wgProxy: String? = null
+
+    @Volatile private var wgDns: String? = null
+
+    @Volatile private var wgApplied: String? = null // the WireGuard config now in the tunnel
 
     // IPv6 on the real network, as the tunnel was built and as last seen. A change rebuilds the tunnel.
     @Volatile private var tunnelHas6 = false
@@ -172,6 +191,11 @@ class WardenVpnService : VpnService(), Bridge {
         restarts = CoroutineScope(Dispatchers.Default).launch {
             Rules.restarts.collect { mainHandler.post { reconnect() } }
         }
+        detours = watchDetours()
+        // Tor takes a while to connect: add its proxy once it's up, drop it if it goes down.
+        tor = CoroutineScope(Dispatchers.Default).launch {
+            BuiltInTor.state.collect { useTor(it) }
+        }
         // The notification's blocked count: redrawn at most every 10s, and not at all while the screen is
         // off (nobody sees it then; each redraw costs System UI work).
         counter = CoroutineScope(Dispatchers.Default).launch {
@@ -223,6 +247,76 @@ class WardenVpnService : VpnService(), Bridge {
         Log.i(TAG, "dns via ${if (dohActive) url else "phone"}")
     }
 
+    /**
+     * Route changes are applied to the running tunnel (no rebuild): set Tor/WireGuard up or down, then
+     * close the changed apps' open connections so their next one takes the new route.
+     */
+    private fun watchDetours() = CoroutineScope(Dispatchers.Default).launch {
+        var before: Triple<Map<Int, Route>, WireGuard?, Boolean>? = null
+        combine(Routing.routes, Routing.wireGuard, Routing.vpnForAll) { r, w, all -> Triple(r, w, all) }.collect { now ->
+            useDetours()
+            val (routes, wg, all) = now
+            val old = before
+            before = now
+            if (old == null) return@collect
+            // "All apps" or a new server touches every app on the VPN; "" closes everyone's connections.
+            if (old.third != all || (all && old.second != wg)) {
+                runCatching { tunnel?.closeConns("") }
+                return@collect
+            }
+            val changed = (old.first.keys + routes.keys).filter { old.first[it] != routes[it] }.toMutableSet()
+            if (old.second != wg) changed += routes.filterValues { it == Route.Vpn }.keys
+            if (changed.isNotEmpty()) runCatching { tunnel?.closeConns(changed.joinToString(",")) }
+        }
+    }
+
+    /** Tor runs while some app uses it (its proxy follows [BuiltInTor.state]); WireGuard likewise. */
+    private fun useDetours() {
+        val t = tunnel ?: return
+        if (Routing.uses(Route.Tor)) BuiltInTor.start(this) else BuiltInTor.stop()
+        val wg = Routing.wireGuard.value?.takeIf { Routing.uses(Route.Vpn) }?.userspace
+        if (wg == wgApplied) return
+        wgProxy = null
+        wgDns = null
+        wgApplied = null
+        runCatching { t.proxies.removeProxy(WG_ID) }
+        if (wg == null) return
+        addDetour(WG_ID, wg)?.let { (p, d) ->
+            wgDns = d
+            wgProxy = p
+            wgApplied = wg
+        }
+    }
+
+    private fun useTor(state: TorState) {
+        if (state != TorState.On || tunnel == null) {
+            torProxy = null
+            torDns = null
+            runCatching { tunnel?.proxies?.removeProxy(Backend.OrbotS5) }
+            return
+        }
+        val t = tunnel ?: return
+        // Any id works for a SOCKS5 proxy; firestack's Orbot one is reused, now pointing at our own Tor.
+        val proxy = runCatching { t.proxies.addProxy(Backend.OrbotS5, "socks5://127.0.0.1:${BuiltInTor.SOCKS_PORT}") }
+            .onFailure { Log.w(TAG, "tor proxy", it) }.getOrNull() ?: return
+        // Names resolve at Tor's DNS port, through Tor. Without it, Tor apps' lookups are refused (never leaked).
+        torDns = runCatching { Intra.addDNSProxy(t, TOR_DNS, "127.0.0.1:${BuiltInTor.DNS_PORT}") }.map { TOR_DNS }
+            .onFailure { Log.w(TAG, "tor dns", it) }.getOrNull()
+        torProxy = proxy.id()
+        Log.i(TAG, "tor up, dns through tor: ${torDns != null}")
+    }
+
+    /** Adds a proxy and DNS through it; firestack registers that DNS under the proxy's id. */
+    private fun addDetour(id: String, config: String): Pair<String, String?>? {
+        val t = tunnel ?: return null
+        val proxy = runCatching { t.proxies.addProxy(id, config) }.onFailure { Log.w(TAG, "proxy $id", it) }.getOrNull()
+            ?: return null
+        val dns = runCatching { Intra.addProxyDNS(t, proxy) }.map { proxy.id() }
+            .onFailure { Log.w(TAG, "dns via $id", it) }.getOrNull()
+        Log.i(TAG, "proxy $id up, dns through it: ${dns != null}")
+        return proxy.id() to dns
+    }
+
     /** Rebuild the tunnel in place, e.g. after the excluded-apps list changed. */
     private fun reconnect() {
         if (tunnel == null) return
@@ -236,10 +330,17 @@ class WardenVpnService : VpnService(), Bridge {
     }
 
     private fun teardown() {
-        listOfNotNull(counter, resets, restarts).forEach { it.cancel() }
+        listOfNotNull(counter, resets, restarts, tor, detours).forEach { it.cancel() }
         counter = null
         resets = null
         restarts = null
+        tor = null
+        detours = null
+        torProxy = null
+        torDns = null
+        wgProxy = null
+        wgDns = null
+        wgApplied = null
         runCatching { cm.unregisterNetworkCallback(networkCallback) }
         tunnel?.disconnect()
         tunnel = null
@@ -247,6 +348,7 @@ class WardenVpnService : VpnService(), Bridge {
 
     private fun shutdown() {
         teardown()
+        BuiltInTor.stop()
         Engine.setRunning(false)
         Engine.setDnsEncrypted(false)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -331,23 +433,30 @@ class WardenVpnService : VpnService(), Bridge {
         // An app talking to its own encrypted resolver would skip every rule below, so that's refused too.
         val bypass = !toOurDns && uid != Process.myUid() && Dns.config.value.stopBypass &&
             Dns.isBypass(names, host(dst), port(dst))
-        val blocked = !toOurDns && (bypass || Rules.blocks(uid, names, cellular))
+        val route = if (toOurDns) Route.Direct else Routing.route(uid)
+        // Tor carries TCP only, so a Tor app's UDP (QUIC, mostly) is refused; it retries over TCP.
+        val blocked = !toOurDns && (bypass || Rules.blocks(uid, names, cellular) || (route == Route.Tor && protocol == UDP))
         if (!toOurDns) {
             Engine.record(
                 NetEvent(cid, System.currentTimeMillis(), uid, protocolName(protocol), names.firstOrNull(), dst, blocked),
             )
         }
         return Mark().apply {
-            pidcsv = route(toOurDns, blocked)
+            pidcsv = route(toOurDns, blocked, route)
             this.cid = cid
             this.uid = uid.toString()
         }
     }
 
-    /** Base = handled inside the tunnel (our fake DNS), Exit = dial out directly, Block = refuse. */
-    private fun route(toOurDns: Boolean, blocked: Boolean): String = when {
+    /**
+     * Base = handled inside the tunnel (our fake DNS), Exit = dial out directly, Block = refuse, or a
+     * proxy id. Fail closed: with Tor or WireGuard chosen but not up, the app gets nothing.
+     */
+    private fun route(toOurDns: Boolean, blocked: Boolean, route: Route): String = when {
         toOurDns -> Backend.Base
         blocked -> Backend.Block
+        route == Route.Tor -> torProxy ?: Backend.Block
+        route == Route.Vpn -> wgProxy ?: Backend.Block
         else -> Backend.Exit
     }
 
@@ -369,7 +478,17 @@ class WardenVpnService : VpnService(), Bridge {
         this.uid = uid
         ipcsv = ""
         // BlockAll answers 0.0.0.0 / ::, which apps give up on at once (checked on device), unlike NXDOMAIN.
-        tidcsv = if (queryBlocked(uid, normalize(domain))) Backend.BlockAll else dnsTransport
+        tidcsv = if (queryBlocked(uid, normalize(domain))) Backend.BlockAll else resolverFor(uid)
+    }
+
+    /**
+     * Detour down: refuse. WireGuard up but DNS through it failed: the normal resolver, so the app still works.
+     * Tor never falls back: a Tor app's lookups leaking to the normal resolver would defeat the point.
+     */
+    private fun resolverFor(uid: String): String = when (Routing.route(uid.toIntOrNull() ?: UNKNOWN_UID)) {
+        Route.Direct -> dnsTransport
+        Route.Tor -> torDns ?: Backend.BlockAll
+        Route.Vpn -> wgDns ?: if (wgProxy != null) dnsTransport else Backend.BlockAll
     }
 
     /** Rules, plus looking up a public encrypted-DNS host (the first step of going around Warden). */
@@ -430,6 +549,9 @@ class WardenVpnService : VpnService(), Bridge {
         private const val MS_PER_S = 1000
         private const val NOTIFY_EVERY_MS = 10_000L
         private const val UNKNOWN_UID = -1
+        private const val UDP = 17
+        private const val TOR_DNS = "TorDns"
+        private val WG_ID = Backend.WG + "0" // firestack treats ids starting "wg" as WireGuard
 
         // Private ranges, same shape as Rethink's defaults: .1 is us, .3 is the fake DNS server.
         private const val GATEWAY4 = "10.111.222.1"

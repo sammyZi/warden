@@ -24,6 +24,16 @@ object AppRules {
     /** Packages that skip Warden entirely (not routed through the VPN, so neither filtered nor logged). */
     val excluded: StateFlow<Set<String>> = _excluded.asStateFlow()
 
+    private val _lockdown = MutableStateFlow(false)
+
+    /** Lockdown: every app is offline unless allowed below, including apps installed later. */
+    val lockdown: StateFlow<Boolean> = _lockdown.asStateFlow()
+
+    private val _allowed = MutableStateFlow<Set<Int>>(emptySet())
+
+    /** UIDs that keep their connection while lockdown is on. */
+    val allowed: StateFlow<Set<Int>> = _allowed.asStateFlow()
+
     private val started = AtomicBoolean()
     private lateinit var prefs: SharedPreferences
 
@@ -36,10 +46,13 @@ object AppRules {
             uid to AppRule(blockWifi = bits and WIFI != 0, blockCellular = bits and CELLULAR != 0)
         }.toMap()
         _excluded.value = prefs.getStringSet(EXCLUDED, emptySet()).orEmpty()
+        _lockdown.value = prefs.getBoolean(LOCKDOWN, false)
+        _allowed.value = prefs.getStringSet(ALLOWED, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
     }
 
     /** Does [uid] get blocked on the current network? Safe from any thread. */
     fun blocks(uid: Int, cellular: Boolean): Boolean {
+        if (_lockdown.value && !isCore(uid) && uid !in _allowed.value) return true
         val rule = _rules.value[uid] ?: return false
         return if (cellular) rule.blockCellular else rule.blockWifi
     }
@@ -59,6 +72,30 @@ object AppRules {
         Rules.restart()
     }
 
+    fun setLockdown(on: Boolean) {
+        prefs.edit().putBoolean(LOCKDOWN, on).apply()
+        _lockdown.value = on
+        Rules.reset("") // every app's open connections are re-checked
+    }
+
+    fun setAllowed(uid: Int, allowed: Boolean) {
+        val next = if (allowed) _allowed.value + uid else _allowed.value - uid
+        prefs.edit().putStringSet(ALLOWED, next.map { it.toString() }.toSet()).apply()
+        _allowed.value = next
+        Rules.reset(uid.toString())
+    }
+
+    /**
+     * Android itself (UIDs below 10000 in any user profile) and unknown owners stay online in lockdown:
+     * blocking them breaks network checks, time sync and DNS for everyone.
+     * ponytail: all-or-nothing for core UIDs; add a "lock Android system too" switch if people ask.
+     */
+    internal fun isCore(uid: Int) = uid < 0 || uid % PER_USER_RANGE < FIRST_APP_UID
+
+    private const val LOCKDOWN = "lockdown"
+    private const val ALLOWED = "lockdown_allowed"
+    private const val PER_USER_RANGE = 100_000
+    private const val FIRST_APP_UID = 10_000
     private const val EXCLUDED = "excluded"
     private const val WIFI = 1
     private const val CELLULAR = 2

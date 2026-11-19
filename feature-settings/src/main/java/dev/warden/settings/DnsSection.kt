@@ -1,6 +1,17 @@
 package dev.warden.settings
 
 import androidx.compose.foundation.background
+import dev.warden.design.R as DesignR
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material3.Icon
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +39,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.warden.design.ButtonKind
-import dev.warden.design.ChoiceChips
 import dev.warden.design.Radii
 import dev.warden.design.Spacing
 import dev.warden.design.Warden
@@ -45,7 +55,7 @@ internal fun ColumnScope.DnsSettings() {
     val config by Dns.config.collectAsState()
 
     Text(stringResource(R.string.dns_upstream), style = Warden.type.body)
-    ChoiceChips(
+    Dropdown(
         Upstream.entries.map {
             stringResource(
                 when (it) {
@@ -57,6 +67,7 @@ internal fun ColumnScope.DnsSettings() {
             )
         },
         config.upstream.ordinal,
+        stringResource(R.string.dns_upstream),
         // Custom without a saved URL keeps using the phone's DNS until one is saved below.
         { Dns.setUpstream(Upstream.entries[it]) },
     )
@@ -126,5 +137,44 @@ private fun CustomUrl(saved: String) {
             kind = ButtonKind.Tonal,
             enabled = valid && url.trim() != saved,
         )
+    }
+}
+
+/** The current choice in a field; tap to open the list of options under it. */
+@Composable
+private fun Dropdown(options: List<String>, selected: Int, label: String, onSelect: (Int) -> Unit) {
+    val c = Warden.colors
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(Radii.small))
+                .background(c.surfaceVariant)
+                .clickable(role = Role.DropdownList) { open = true }
+                .semantics { contentDescription = label }
+                .padding(horizontal = Spacing.l),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(options[selected], Modifier.weight(1f), style = Warden.type.body)
+            Icon(
+                painterResource(DesignR.drawable.ph_caret_right),
+                null,
+                Modifier.size(16.dp).graphicsLayer { rotationZ = if (open) 270f else 90f },
+                tint = c.muted,
+            )
+        }
+        DropdownMenu(open, { open = false }, containerColor = c.surface) {
+            options.forEachIndexed { i, option ->
+                DropdownMenuItem(
+                    text = { Text(option, style = Warden.type.body, color = if (i == selected) c.accentInk else c.text) },
+                    onClick = {
+                        open = false
+                        onSelect(i)
+                    },
+                )
+            }
+        }
     }
 }

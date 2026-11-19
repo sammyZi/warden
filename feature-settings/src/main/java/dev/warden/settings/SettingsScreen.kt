@@ -178,6 +178,12 @@ private fun SettingsHome(
             }
         }
 
+        Section(stringResource(R.string.protection_title), note = stringResource(R.string.protection_note)) {
+            LockdownRow()
+            HorizontalDivider(color = c.outline)
+            WireGuardRow()
+        }
+
         Section(stringResource(R.string.dns_title), note = stringResource(R.string.dns_note)) {
             DnsSettings()
         }
@@ -200,6 +206,8 @@ private fun SettingsHome(
 
         Section(stringResource(R.string.settings_general)) {
             AddTileRow()
+            HorizontalDivider(color = c.outline)
+            UpdateRow()
             HorizontalDivider(color = c.outline)
             LinkRow(DesignR.drawable.ph_device_mobile_light, stringResource(R.string.settings_replay_intro), onReplayIntro)
             HorizontalDivider(color = c.outline)

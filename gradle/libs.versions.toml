@@ -1,5 +1,7 @@
 [versions]
 compileSdk = "37"
+# Minor SDK level: tor-android needs 37.1 or later to compile against.
+compileSdkMinor = "2"
 minSdk = "26"
 agp = "9.5.0"
 kotlin = "2.4.21"
@@ -14,6 +16,11 @@ room = "2.8.5"
 ksp = "2.3.12"
 # Frosted backdrop blur for the tab bar (Apache-2.0); RenderEffect on API 31+, tinted fallback below.
 haze = "2.0.1"
+# Tor built in for apps routed through it (BSD-3-Clause, Guardian Project).
+tor-android = "0.4.9.17"
+# QR scan for WireGuard configs: camera preview (AndroidX) and decoding (ZXing), both Apache-2.0.
+camerax = "1.7.0"
+zxing = "3.5.4"
 # detekt 2.x is still alpha (Oct 2026); 1.23.8 runs with its own embedded Kotlin.
 detekt = "1.23.8"
 
@@ -30,6 +37,11 @@ room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+tor-android = { module = "info.guardianproject:tor-android", version.ref = "tor-android" }
 haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 detekt-formatting = { module = "io.gitlab.arturbosch.detekt:detekt-formatting", version.ref = "detekt" }
 

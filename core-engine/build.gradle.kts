@@ -4,7 +4,9 @@ plugins {
 
 android {
     namespace = "dev.warden.engine"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk {
+        version = release(libs.versions.compileSdk.get().toInt()) { minorApiLevel = libs.versions.compileSdkMinor.get().toInt() }
+    }
     defaultConfig.minSdk = libs.versions.minSdk.get().toInt()
 }
 
@@ -13,4 +15,5 @@ dependencies {
     implementation(project(":core-rules"))
     // Published with <packaging>jar</packaging> but the file is an AAR.
     api(libs.firestack) { artifact { type = "aar" } }
+    implementation(libs.tor.android)
 }

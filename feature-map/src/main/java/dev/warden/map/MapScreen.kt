@@ -256,7 +256,7 @@ private fun Overview(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.m),
                 ) {
-                    Swatch(countryHue(d.country.iso, c.palette))
+                    CountryMark(d.country.iso, countryHue(d.country.iso, c.palette))
                     Column(Modifier.weight(1f)) {
                         Text(countryName(d.country.iso), style = Warden.type.title)
                         Text(
@@ -405,12 +405,15 @@ private fun CountryDetail(
             }
         }
         item {
-            Column(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.s)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                    Swatch(hue)
-                    SectionLabel(d.country.iso.removePrefix(Geo.EDGE_PREFIX))
-                }
+            Row(
+                Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.s),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.m),
+            ) {
+                CountryMark(d.country.iso, hue)
                 Text(countryName(d.country.iso), style = Warden.type.headline)
+            }
+            Column(Modifier.padding(horizontal = Spacing.xl)) {
                 if (d.country.iso.startsWith(Geo.EDGE_PREFIX)) {
                     Text(stringResource(R.string.map_edge_explain), style = Warden.type.body, color = c.muted)
                 }
@@ -491,9 +494,6 @@ private fun AppIcon(uid: Int, appIcon: (Int) -> ImageBitmap?) {
     val icon = appIcon(uid)
     if (icon != null) Image(icon, null, Modifier.size(32.dp)) else IconBadge(DesignR.drawable.ph_squares_four, Warden.colors.muted)
 }
-
-@Composable
-private fun Swatch(color: Color) = Box(Modifier.size(10.dp).background(color, CircleShape))
 
 @Composable
 private fun BlockedTag(count: Int) {

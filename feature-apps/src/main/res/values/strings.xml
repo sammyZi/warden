@@ -125,4 +125,16 @@
     <string name="apps_data_mobile">Mobile · 30 days</string>
     <string name="report_tile_none">No grade</string>
     <string name="report_tile_none_body">No traffic yet</string>
+    <string name="apps_lockdown">In lockdown</string>
+    <string name="apps_lockdown_for">Allow %1$s while lockdown is on</string>
+    <string name="route_title">Send traffic</string>
+    <string name="route_direct">Direct</string>
+    <string name="route_tor">Tor</string>
+    <string name="route_vpn">Your VPN</string>
+    <string name="route_vpn_all">Your VPN is on for all apps, so this app uses it too.</string>
+    <string name="route_vpn_missing">Add your WireGuard config in Settings first. Until then %1$s stays offline instead of going direct.</string>
+    <string name="route_vpn_on">Through your WireGuard server at %1$s.</string>
+    <string name="tor_on">Through Tor. Websites see a Tor address, not yours.</string>
+    <string name="tor_connecting">Connecting to Tor… %1$s stays offline until it\'s connected. The first time can take half a minute.</string>
+    <string name="tor_when_on">Tor starts when protection is on.</string>
 </resources>

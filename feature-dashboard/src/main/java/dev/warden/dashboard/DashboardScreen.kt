@@ -1,6 +1,12 @@
 package dev.warden.dashboard
 
 import dev.warden.design.ScreenTitle
+import dev.warden.engine.Engine
+import android.widget.Toast
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import dev.warden.rules.AppRules
+import androidx.compose.foundation.layout.Box
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
@@ -17,7 +23,6 @@ import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -115,15 +120,14 @@ fun DashboardScreen(
         ) {
             // Same header slot as every other tab.
             ScreenTitle(stringResource(R.string.dashboard_title), Modifier.padding(top = Spacing.s, bottom = Spacing.s))
-            Text(
-                stringResource(if (state == PowerState.On) R.string.dashboard_on_detail else R.string.dashboard_off_detail),
-                style = Warden.type.body,
-                color = c.muted,
-            )
-            Spacer(Modifier.height(Spacing.l))
+            Spacer(Modifier.height(Spacing.s))
             ProtectionPill(state, onPowerClick)
             Spacer(Modifier.height(Spacing.s))
-            DnsCard(active = state == PowerState.On, onOpenSettings = onOpenSettings)
+            // DNS and lockdown share a row, 3:1, the same height.
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                DnsCard(active = state == PowerState.On, onOpenSettings = onOpenSettings, modifier = Modifier.weight(3f).fillMaxHeight())
+                LockdownButton(Modifier.weight(1f).fillMaxHeight())
+            }
             PrivateDnsWarning()
             if (!blocklistsOn) {
                 // Nothing is blocked until a list is on; say so where the zero shows up.
@@ -286,7 +290,6 @@ private fun ProtectionPill(state: PowerState, onClick: () -> Unit) {
             .heightIn(min = 128.dp)
             .clip(RoundedCornerShape(Radii.large))
             .background(fill)
-            .border(1.dp, if (on) fill else c.outline, RoundedCornerShape(Radii.large))
             .clickable(role = Role.Switch, onClick = onClick)
             .padding(horizontal = Spacing.l, vertical = Spacing.l),
         verticalAlignment = Alignment.CenterVertically,
@@ -350,5 +353,35 @@ private fun PrivateDnsWarning() {
             }
             Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(18.dp), tint = c.muted)
         }
+    }
+}
+
+/** Lockdown on or off from Home: red lock when every app not allowed on its own page is offline. */
+@Composable
+private fun LockdownButton(modifier: Modifier = Modifier) {
+    val c = Warden.colors
+    val on by AppRules.lockdown.collectAsState()
+    val running by Engine.running.collectAsState()
+    val context = LocalContext.current
+    val shape = RoundedCornerShape(Radii.medium)
+    Box(
+        modifier
+            .clip(shape)
+            .background(if (on) c.blocked.copy(alpha = 0.16f) else c.surface)
+            .clickable(role = Role.Switch) {
+                AppRules.setLockdown(!on)
+                // Lockdown only blocks while Warden filters traffic, so say so when protection is off.
+                if (!on && !running) {
+                    Toast.makeText(context, R.string.dashboard_lockdown_needs_protection, Toast.LENGTH_SHORT).show()
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painterResource(DesignR.drawable.ph_lock_simple),
+            stringResource(if (on) R.string.dashboard_lockdown_on else R.string.dashboard_lockdown_off),
+            Modifier.size(24.dp),
+            tint = if (on) c.blocked else c.muted,
+        )
     }
 }

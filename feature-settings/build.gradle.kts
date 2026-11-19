@@ -5,7 +5,9 @@ plugins {
 
 android {
     namespace = "dev.warden.settings"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk {
+        version = release(libs.versions.compileSdk.get().toInt()) { minorApiLevel = libs.versions.compileSdkMinor.get().toInt() }
+    }
     defaultConfig.minSdk = libs.versions.minSdk.get().toInt()
     buildFeatures.compose = true
 }
@@ -15,4 +17,9 @@ dependencies {
     implementation(project(":core-rules"))
     implementation(project(":core-data"))
     implementation(libs.activity.compose)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
+    implementation(libs.zxing.core)
+    testImplementation(libs.junit)
 }

@@ -2,3 +2,6 @@
 # Shrinking and optimising stay on.
 -dontobfuscate
 -keepattributes SourceFile,LineNumberTable
+# Tor is native code called through JNI by these classes.
+-keep class org.torproject.jni.** { *; }
+-keep class net.freehaven.tor.control.** { *; }

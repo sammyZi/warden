@@ -295,7 +295,18 @@ private fun AccessCard(uid: Int, name: String) {
     val c = Warden.colors
     val rules by AppRules.rules.collectAsState()
     val rule = rules[uid] ?: AppRule()
+    val lockdown by AppRules.lockdown.collectAsState()
+    val lockdownAllowed by AppRules.allowed.collectAsState()
     Tile(Modifier.fillMaxWidth()) {
+        if (lockdown && uid >= FIRST_APP_UID) {
+            AccessRow(
+                DesignR.drawable.ph_lock_simple,
+                stringResource(R.string.apps_lockdown),
+                allowed = uid in lockdownAllowed,
+                description = stringResource(R.string.apps_lockdown_for, name),
+            ) { AppRules.setAllowed(uid, it) }
+            HorizontalDivider(color = c.outline)
+        }
         AccessRow(
             DesignR.drawable.ph_wifi_high,
             stringResource(R.string.apps_wifi),
@@ -337,8 +348,15 @@ private fun AccessCard(uid: Int, name: String) {
                 enabled = packages.isNotEmpty(),
             )
         }
+        if (!skipped) {
+            HorizontalDivider(color = c.outline)
+            RouteRow(uid, name)
+        }
     }
 }
+
+// Android's own UIDs stay online in lockdown (see AppRules.isCore), so they get no switch.
+private const val FIRST_APP_UID = 10_000
 
 @Composable
 private fun AccessRow(icon: Int, label: String, allowed: Boolean, description: String, onChange: (Boolean) -> Unit) {

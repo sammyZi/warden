@@ -23,6 +23,12 @@
                 android:value="true" />
         </service>
 
+        <!-- Tor (tor-android) in its own process: sharing one with firestack's Go runtime stalled the tunnel. -->
+        <service
+            android:name="org.torproject.jni.TorService"
+            android:exported="false"
+            android:process=":tor" />
+
         <service
             android:name="dev.warden.engine.ProtectionTileService"
             android:exported="true"
