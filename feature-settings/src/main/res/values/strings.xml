@@ -46,7 +46,9 @@
     <string name="settings_clear_confirm">Clear</string>
     <string name="settings_cancel">Cancel</string>
     <string name="settings_about">About</string>
-    <string name="settings_promise">No account, no analytics, no cloud. Nothing is decrypted.</string>
+    <string name="settings_promise">No account, no analytics, no ads. Nothing is decrypted or sent to us.</string>
+    <string name="settings_privacy">Privacy policy</string>
+    <string name="settings_terms">Terms of use</string>
     <string name="settings_credits_title">Open-source credits</string>
     <string name="settings_credits">Engine: firestack (MPL-2.0). IP geolocation by DB-IP.com (CC BY 4.0). Map: Natural Earth. Font: Rubik (OFL). Icons: Phosphor (MIT).</string>
     <string name="settings_version">Version %1$s</string>
@@ -89,7 +91,7 @@
     <string name="wg_import">Import</string>
     <string name="wg_manual">Type in</string>
     <string name="wg_all">Use for all apps</string>
-    <string name="wg_scan">Scan</string>
+    <string name="wg_scan">Scan a WireGuard QR code</string>
     <string name="wg_scan_hint">Point at your provider\'s WireGuard QR code</string>
     <string name="wg_scan_no_camera">camera permission was declined</string>
     <string name="wg_manual_title">Add a WireGuard server</string>

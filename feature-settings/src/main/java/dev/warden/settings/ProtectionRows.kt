@@ -1,6 +1,9 @@
 package dev.warden.settings
 
 import android.net.Uri
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import android.Manifest
@@ -127,13 +130,18 @@ internal fun WireGuardRow() {
             )
         }
         // Scan a provider's WireGuard QR code; the camera is asked for only here.
-        WardenButton(stringResource(R.string.wg_scan), {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                scanning = true
-            } else {
-                askCamera.launch(Manifest.permission.CAMERA)
-            }
-        }, kind = ButtonKind.Text)
+        Box(
+            Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button) {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    scanning = true
+                } else {
+                    askCamera.launch(Manifest.permission.CAMERA)
+                }
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(painterResource(DesignR.drawable.ph_scan), stringResource(R.string.wg_scan), Modifier.size(24.dp), tint = c.text)
+        }
     }
     servers.forEach { server ->
         val on = server.id == selected

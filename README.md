@@ -93,11 +93,14 @@ flowchart LR
 
 - No account, no analytics, no automatic crash reporting, no ads, no cloud. After a crash, a report stays
   on your phone until you choose to copy it.
-- Warden's own network calls are only the ones you switch on: blocklist downloads, and lookups to the
-  encrypted DNS server you pick.
+- Warden's own network calls: a daily update check to GitHub (on by default, can be switched off),
+  blocklists you switch on, lookups to the DNS server you pick, and Tor or your WireGuard server only for
+  apps you route there.
 - Warden never decrypts HTTPS. It sees *where* apps connect (domain, IP, port), never *what* they send.
 - IP-to-country lookups use an offline database bundled in the app. History stays on the phone and can
   be cleared from Settings.
+
+Full details: [Privacy policy](PRIVACY.md) · [Terms of use](TERMS.md)
 
 ## Honest limitations
 

@@ -1,5 +1,9 @@
 package dev.warden.settings
 
+import androidx.compose.ui.platform.LocalContext
+import android.net.Uri
+import android.content.Intent
+import android.content.Context
 import dev.warden.design.ScreenTitle
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
@@ -218,6 +222,11 @@ private fun SettingsHome(
         Section(stringResource(R.string.settings_about)) {
             Text(stringResource(R.string.settings_promise), style = Warden.type.body)
             HorizontalDivider(color = c.outline)
+            val context = LocalContext.current
+            LinkRow(DesignR.drawable.ph_eye_slash_light, stringResource(R.string.settings_privacy)) { openPage(context, PRIVACY_URL) }
+            HorizontalDivider(color = c.outline)
+            LinkRow(DesignR.drawable.ph_shield_check_light, stringResource(R.string.settings_terms)) { openPage(context, TERMS_URL) }
+            HorizontalDivider(color = c.outline)
             Credits()
             Text(stringResource(R.string.settings_version, version).uppercase(), style = Warden.type.caption, color = c.muted)
         }
@@ -350,3 +359,11 @@ private fun ClearHistoryRow() {
         )
     }
 }
+
+/** Opens a page in the browser; does nothing if the phone has none. */
+private fun openPage(context: Context, url: String) {
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+}
+
+private const val PRIVACY_URL = "https://github.com/sammyZi/warden/blob/main/PRIVACY.md"
+private const val TERMS_URL = "https://github.com/sammyZi/warden/blob/main/TERMS.md"
