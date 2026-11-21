@@ -26,6 +26,10 @@
 
     <string name="settings_blocklists">Blocklists</string>
     <string name="settings_blocklists_note">Refreshed weekly on Wi-Fi.</string>
+    <string name="settings_bl_add">Add list</string>
+    <string name="settings_bl_add_title">Add a blocklist</string>
+    <string name="settings_bl_url">List address</string>
+    <string name="settings_bl_url_hint">https://example.com/hosts.txt</string>
     <string name="settings_bl_refresh">Update %1$s now</string>
     <string name="settings_bl_downloading">Downloading…</string>
     <string name="settings_bl_failed">Failed · tap to retry</string>
@@ -80,12 +84,36 @@
     <string name="settings_tile_how">Swipe down twice, tap the pencil, drag in Protection.</string>
     <string name="settings_tile_ok">Got it</string>
     <string name="settings_tile_already">Already in Quick Settings</string>
-    <string name="protection_title">Lockdown and VPN</string>
-    <string name="protection_note">Pick a route on each app\'s page.</string>
+    <string name="protection_title">Lockdown</string>
+    <string name="protection_note">Only apps you allow can go online.</string>
     <string name="lockdown">Lockdown</string>
     <string name="lockdown_off">Off</string>
     <string name="lockdown_on">On · %1$d apps allowed</string>
     <string name="wg_title">Your VPN</string>
+    <string name="vpn_back">Back</string>
+    <string name="vpn_servers">Servers</string>
+    <string name="vpn_no_server">No server yet</string>
+    <string name="vpn_no_server_body">Add one under Servers</string>
+    <string name="vpn_status_all">Every app goes through it, except apps set to Tor.</string>
+    <string name="vpn_status_none">No apps use it yet.</string>
+    <plurals name="vpn_status_apps">
+        <item quantity="one">Used by %1$d app.</item>
+        <item quantity="other">Used by %1$d apps.</item>
+    </plurals>
+    <string name="vpn_apps_vpn">Through Your VPN</string>
+    <string name="vpn_apps_tor">Through Tor</string>
+    <string name="vpn_apps_all">All apps, except those set to Tor.</string>
+    <string name="vpn_apps_none">No apps yet.</string>
+    <string name="vpn_add_apps">Choose apps</string>
+    <string name="vpn_search">Search</string>
+    <string name="vpn_search_hint">App name</string>
+    <string name="vpn_on_tor">Now through Tor</string>
+    <string name="vpn_on_vpn">Now through Your VPN</string>
+    <plurals name="vpn_n_apps">
+        <item quantity="one">%1$d app</item>
+        <item quantity="other">%1$d apps</item>
+    </plurals>
+    <string name="vpn_about">Send apps through your own WireGuard server.</string>
     <string name="wg_none">WireGuard</string>
     <string name="wg_pick">Tick the server to use.</string>
     <string name="wg_import">Import</string>
@@ -125,4 +153,21 @@
     <string name="update_channel">New versions</string>
     <string name="update_title">Warden %1$s is out</string>
     <string name="update_text">Tap to see what\'s new and download it.</string>
+    <string name="bl_blocked_title">Blocked</string>
+    <string name="bl_range_today">Today</string>
+    <string name="bl_range_week">7 days</string>
+    <string name="bl_range_month">30 days</string>
+    <string name="bl_blocked_none">Nothing blocked in this time.</string>
+    <plurals name="bl_blocked_total">
+        <item quantity="one">%1$s block across %2$d domains</item>
+        <item quantity="other">%1$s blocks across %2$d domains</item>
+    </plurals>
+    <plurals name="bl_blocked_apps">
+        <item quantity="one">%1$d app</item>
+        <item quantity="other">%1$d apps</item>
+    </plurals>
+    <string name="bl_blocked_last">last at %1$s</string>
+    <string name="bl_rule_default">Default</string>
+    <string name="bl_rule_allow">Allow everywhere</string>
+    <string name="bl_rule_block">Block everywhere</string>
 </resources>

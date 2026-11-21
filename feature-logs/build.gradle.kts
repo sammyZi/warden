@@ -16,4 +16,6 @@ dependencies {
     implementation(project(":core-design"))
     implementation(project(":core-engine"))
     implementation(project(":core-rules"))
+    implementation(project(":core-data"))
+    implementation(libs.activity.compose)
 }

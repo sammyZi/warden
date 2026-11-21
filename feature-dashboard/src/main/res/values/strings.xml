@@ -50,6 +50,20 @@
     <string name="tool_back">Back to Home</string>
     <string name="tool_trackers">Trackers</string>
     <string name="tool_data">Data</string>
+    <string name="tool_vpn">VPN</string>
+    <string name="tool_blocklists">Blocklists</string>
+    <string name="tool_bl_none">Tap to turn one on</string>
+    <plurals name="tool_bl_domains">
+        <item quantity="one">%1$s domain blocked</item>
+        <item quantity="other">%1$s domains blocked</item>
+    </plurals>
+    <string name="tool_vpn_off">Off</string>
+    <string name="tool_vpn_add">Add a server</string>
+    <string name="tool_vpn_all">All apps</string>
+    <plurals name="tool_vpn_apps">
+        <item quantity="one">%1$d app</item>
+        <item quantity="other">%1$d apps</item>
+    </plurals>
     <string name="tool_data_box">sent and received</string>
     <string name="tool_trackers_about">Known tracking companies your apps reached, and the domains they used.</string>
     <string name="tool_data_about">How much data each app used, sent and received.</string>

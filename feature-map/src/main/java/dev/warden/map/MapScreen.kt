@@ -550,6 +550,14 @@ private fun loadGeo(context: Context): Geo = cachedGeo ?: synchronized(Geo::clas
 private const val DEFAULT_LAT = 20f
 
 /**
+ * ISO country of a literal IP, from the bundled offline database (nothing is looked up online).
+ * Null for hostnames, private ranges, anycast networks (no honest country) and unknown addresses.
+ */
+suspend fun ipCountry(context: Context, ip: String): String? = withContext(Dispatchers.Default) {
+    loadGeo(context.applicationContext).lookup(ip.trim('[', ']'))?.iso?.takeUnless { it.startsWith(Geo.EDGE_PREFIX) }
+}
+
+/**
  * One pill showing the current choice; tapping opens a searchable sheet of every app that connected,
  * busiest first, where any number of apps can be picked. Empty selection = all apps.
  */

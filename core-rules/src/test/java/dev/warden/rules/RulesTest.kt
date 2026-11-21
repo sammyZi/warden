@@ -16,6 +16,12 @@ class RulesTest {
         assertEquals(Verdict.Block, Rules.lookup(rules, "*:", "eu.ads.example.com"))
     }
 
+    @Test fun globalAllowCoversSubdomains() {
+        val allowed = mapOf("*:ads.example.net" to Verdict.Allow)
+        assertEquals(Verdict.Allow, Rules.lookup(allowed, "*:", "cdn.ads.example.net"))
+        assertNull(Rules.lookup(allowed, "*:", "example.net"))
+    }
+
     @Test fun noRuleMeansNoVerdict() {
         assertNull(Rules.lookup(rules, "*:", "example.org"))
         assertNull(Rules.lookup(rules, "*:", "notexample.com"))

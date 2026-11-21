@@ -17,12 +17,13 @@ import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** A downloadable list. Nothing is bundled: lists come from their publishers when switched on. */
-data class BlocklistSource(val id: String, val name: String, val url: String, val license: String)
+data class BlocklistSource(val id: String, val name: String, val url: String, val license: String, val custom: Boolean = false)
 
 data class BlocklistState(
     val enabled: Boolean = false,
@@ -50,6 +51,11 @@ object Blocklists {
         BlocklistSource("oisd-small", "OISD Small", "https://small.oisd.nl/domainswild", "GPL-3.0"),
     )
 
+    private val _sources = MutableStateFlow(catalog)
+
+    /** The built-in lists, then any the user added by URL. */
+    val sources: StateFlow<List<BlocklistSource>> = _sources.asStateFlow()
+
     private val _states = MutableStateFlow(catalog.associate { it.id to BlocklistState() })
     val states: StateFlow<Map<String, BlocklistState>> = _states.asStateFlow()
 
@@ -70,7 +76,12 @@ object Blocklists {
         dir = File(app.filesDir, "blocklists").apply { mkdirs() }
         prefs = app.getSharedPreferences("blocklists", Context.MODE_PRIVATE)
         cm = app.getSystemService(ConnectivityManager::class.java)
-        _states.value = catalog.associate {
+        _sources.value = catalog + prefs.all.keys.filter { it.startsWith(CUSTOM_URL) }.sorted().mapNotNull { key ->
+            val id = key.removePrefix(CUSTOM_URL)
+            val url = prefs.getString(key, null) ?: return@mapNotNull null
+            BlocklistSource(id, prefs.getString(CUSTOM_NAME + id, null).orEmpty().ifEmpty { hostOf(url) }, url, hostOf(url), custom = true)
+        }
+        _states.value = _sources.value.associate {
             it.id to BlocklistState(
                 enabled = prefs.getBoolean("on.${it.id}", false),
                 entries = prefs.getInt("n.${it.id}", 0),
@@ -92,6 +103,33 @@ object Blocklists {
         }
     }
 
+    /**
+     * Adds a list from any https URL (hosts file or one domain per line), switches it on and downloads it.
+     * Throws [IllegalArgumentException] if the URL can't be used.
+     */
+    fun addCustom(name: String, url: String) {
+        val clean = url.trim()
+        require(isValidListUrl(clean)) { "Needs a full https:// address" }
+        require(_sources.value.none { it.url == clean }) { "That list is already added" }
+        val id = "custom-" + System.currentTimeMillis()
+        val label = name.trim().ifEmpty { hostOf(clean) }
+        prefs.edit().putString(CUSTOM_URL + id, clean).putString(CUSTOM_NAME + id, name.trim()).apply()
+        _sources.update { it + BlocklistSource(id, label, clean, hostOf(clean), custom = true) }
+        _states.update { it + (id to BlocklistState()) }
+        setEnabled(id, true)
+    }
+
+    fun removeCustom(id: String) {
+        prefs.edit().remove(CUSTOM_URL + id).remove(CUSTOM_NAME + id)
+            .remove("on.$id").remove("n.$id").remove("t.$id").apply()
+        _sources.update { list -> list.filterNot { it.id == id } }
+        _states.update { it - id }
+        scope.launch {
+            lock.withLock { file(id).delete() }
+            rebuild()
+        }
+    }
+
     fun refresh(id: String) {
         scope.launch {
             download(id)
@@ -101,10 +139,12 @@ object Blocklists {
 
     private fun file(id: String) = File(dir, "$id.txt")
 
-    private fun set(id: String, f: (BlocklistState) -> BlocklistState) = _states.update { it + (id to f(it.getValue(id))) }
+    // A list deleted while it downloads simply drops the late update.
+    private fun set(id: String, f: (BlocklistState) -> BlocklistState) =
+        _states.update { states -> states[id]?.let { states + (id to f(it)) } ?: states }
 
     private suspend fun download(id: String) {
-        val source = catalog.first { it.id == id }
+        val source = _sources.value.firstOrNull { it.id == id } ?: return
         set(id) { it.copy(busy = true, failed = false) }
         try {
             val tmp = File(dir, "$id.tmp")
@@ -155,7 +195,17 @@ object Blocklists {
         rebuild()
     }
 
+    private fun hostOf(url: String) = runCatching { URI(url).host }.getOrNull().orEmpty().ifEmpty { url }
+
+    private const val CUSTOM_URL = "custom.url."
+    private const val CUSTOM_NAME = "custom.name."
     private const val TAG = "Blocklists"
     private const val TIMEOUT_MS = 30_000
     private const val STALE_DAYS = 7L
 }
+
+/** A list address Warden will fetch: https with a host. Plain http could be tampered with on the way. */
+fun isValidListUrl(url: String): Boolean = runCatching {
+    val u = URI(url.trim())
+    u.scheme == "https" && !u.host.isNullOrBlank()
+}.getOrDefault(false)

@@ -58,6 +58,12 @@ import dev.warden.design.Warden
 import dev.warden.design.formatBytes
 import dev.warden.design.tabular
 import dev.warden.rules.Trackers
+import androidx.compose.runtime.produceState
+import java.text.NumberFormat
+import dev.warden.rules.Blocklists
+import androidx.compose.foundation.layout.Spacer
+import dev.warden.rules.Routing
+import dev.warden.rules.Route
 import dev.warden.rules.summarizeTrackers
 import dev.warden.design.R as DesignR
 
@@ -65,6 +71,8 @@ import dev.warden.design.R as DesignR
 internal enum class Tool(@StringRes val title: Int, @DrawableRes val icon: Int) {
     Trackers(R.string.tool_trackers, DesignR.drawable.ph_eye_slash_light),
     Data(R.string.tool_data, DesignR.drawable.ph_cell_signal_full),
+    Vpn(R.string.tool_vpn, DesignR.drawable.ph_lock_key_light),
+    Blocklists(R.string.tool_blocklists, DesignR.drawable.ph_shield_check),
 }
 
 /** Headline numbers for every tool over one range, from saved history. */
@@ -80,9 +88,9 @@ private fun toolData(range: Range): ToolData {
     return ToolData(all, domains)
 }
 
-/** Two-by-two grid of tool boxes. */
+/** Tool boxes, two to a row (2×2), kept short. */
 @Composable
-internal fun ToolsGrid(range: Range, onOpen: (Tool) -> Unit) {
+internal fun ToolsGrid(range: Range, vpnCountry: suspend (ip: String) -> String?, onOpen: (Tool) -> Unit) {
     val d = toolData(range)
     val trackers = remember(d.domains) { summarizeTrackers(d.domains) }
     val (access, _) = rememberUsageAccess()
@@ -93,18 +101,52 @@ internal fun ToolsGrid(range: Range, onOpen: (Tool) -> Unit) {
                 pluralStringResource(R.plurals.dashboard_n_companies, trackers.companies, trackers.companies)
             ),
         Tool.Data to (formatBytes(dataTotal) to stringResource(if (access) R.string.tool_data_box_system else R.string.tool_data_box)),
+        Tool.Vpn to vpnBox(vpnCountry),
+        Tool.Blocklists to blocklistBox(),
     )
     val p = Warden.colors.palette
     val hues = listOf(Warden.colors.blocked, p[0], p[3], p[4])
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
-        Tool.entries.chunked(2).forEach { pair ->
+        Tool.entries.chunked(PER_ROW).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                pair.forEach { tool ->
+                row.forEach { tool ->
                     val (value, caption) = values.getValue(tool)
                     ToolBox(tool, hues[tool.ordinal % hues.size], value, caption, Modifier.weight(1f)) { onOpen(tool) }
                 }
+                repeat(PER_ROW - row.size) { Spacer(Modifier.weight(1f)) } // a short last row keeps box widths
             }
         }
+    }
+}
+
+/** The blocklists box: how many lists are on, and how many domains they hold. */
+@Composable
+private fun blocklistBox(): Pair<String, String> {
+    val states by Blocklists.states.collectAsState()
+    val on = states.values.filter { it.enabled }
+    if (on.isEmpty()) return stringResource(R.string.tool_vpn_off) to stringResource(R.string.tool_bl_none)
+    val domains = on.sumOf { it.entries }
+    val count = NumberFormat.getIntegerInstance().format(domains)
+    return on.size.toString() to pluralStringResource(R.plurals.tool_bl_domains, domains, count)
+}
+
+/** The VPN box: the ticked server (or Off), and who uses it. */
+@Composable
+private fun vpnBox(vpnCountry: suspend (ip: String) -> String?): Pair<String, String> {
+    val servers by Routing.servers.collectAsState()
+    val selected by Routing.selected.collectAsState()
+    val routes by Routing.routes.collectAsState()
+    val all by Routing.vpnForAll.collectAsState()
+    val server = servers.firstOrNull { it.id == selected }
+        ?: return stringResource(R.string.tool_vpn_off) to stringResource(R.string.tool_vpn_add)
+    val apps = routes.values.count { it == Route.Vpn }
+    // The server's flag before its name, from its IP (offline lookup).
+    val iso by produceState<String?>(null, server.config.endpoint) { value = vpnCountry(server.config.endpoint) }
+    val flag = iso?.let(::flagEmoji)
+    return (if (flag != null) "$flag ${server.name}" else server.name) to if (all) {
+        stringResource(R.string.tool_vpn_all)
+    } else {
+        pluralStringResource(R.plurals.tool_vpn_apps, apps, apps)
     }
 }
 
@@ -113,7 +155,7 @@ private fun ToolBox(tool: Tool, hue: Color, value: String, caption: String, modi
     val c = Warden.colors
     Column(
         modifier
-            .aspectRatio(1.25f)
+            .aspectRatio(1.7f)
             .clip(RoundedCornerShape(Radii.medium))
             .background(hue.copy(alpha = if (c.isDark) 0.22f else 0.13f))
             .clickable(onClick = onClick)
@@ -121,18 +163,17 @@ private fun ToolBox(tool: Tool, hue: Color, value: String, caption: String, modi
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(painterResource(tool.icon), null, Modifier.size(18.dp), tint = hue)
+            Icon(painterResource(tool.icon), null, Modifier.size(16.dp), tint = hue)
             Text(
                 stringResource(tool.title).uppercase(),
-                Modifier.weight(1f).padding(start = Spacing.s),
+                Modifier.weight(1f).padding(start = Spacing.xs),
                 style = Warden.type.caption,
                 color = c.muted,
                 maxLines = 1,
             )
-            Icon(painterResource(DesignR.drawable.ph_caret_right), null, Modifier.size(14.dp), tint = c.muted)
         }
         Column {
-            Text(value, style = Warden.type.headline.tabular(), maxLines = 1)
+            Text(value, style = Warden.type.title.tabular(), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(caption, style = Warden.type.label, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -215,6 +256,7 @@ private class AppLine(val uid: Int, val value: Float, val usage: Usage)
 private fun rows(tool: Tool, usage: List<Usage>): List<AppLine> = when (tool) {
     Tool.Trackers -> emptyList()
     Tool.Data -> usage.map { AppLine(it.uid, it.total.toFloat(), it) }.filter { it.value > 0 }
+    Tool.Vpn, Tool.Blocklists -> emptyList() // have their own screens
 }.sortedByDescending { it.value }
 
 @Composable
@@ -313,6 +355,19 @@ private fun TrackerCompanies(domains: List<String>, range: Range) {
 private fun about(tool: Tool): Int = when (tool) {
     Tool.Trackers -> R.string.tool_trackers_about
     Tool.Data -> R.string.tool_data_about
+    Tool.Vpn -> R.string.tool_vpn
+    Tool.Blocklists -> R.string.tool_blocklists
 }
 
 private const val MAX_APPS = 500
+
+private const val PER_ROW = 2
+
+/** Flag emoji from a two-letter country code; null for anything else. */
+private fun flagEmoji(iso: String): String? {
+    val code = iso.uppercase()
+    if (code.length != 2 || !code.all { it in 'A'..'Z' }) return null
+    return code.map { String(Character.toChars(REGIONAL_A + (it - 'A'))) }.joinToString("")
+}
+
+private const val REGIONAL_A = 0x1F1E6

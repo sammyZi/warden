@@ -27,7 +27,7 @@ Warden's own traffic goes straight to these services, each with its own privacy 
 | What | When | Who sees it |
 |---|---|---|
 | Update check | Once a day. **On by default**; switch off in Settings → Update alerts | GitHub (api.github.com) sees your IP address and that you run Warden |
-| Blocklist downloads | Only for lists you switch on, about weekly | The list's host: jsDelivr (HaGeZi), GitHub (StevenBlack), oisd.nl (OISD) |
+| Blocklist downloads | Only for lists you switch on, about weekly | The list's host: jsDelivr (HaGeZi), GitHub (StevenBlack), oisd.nl (OISD), or the address of a list you added |
 | DNS lookups for your apps | While protection is on | The DNS service you pick: your network's, Cloudflare, Quad9, or your own |
 | Tor | Only while an app is set to Tor | The Tor network. Relays see encrypted traffic; exits see where it goes, not who you are |
 | Your VPN | Only while an app uses it | The WireGuard server you added, run by you or your provider |

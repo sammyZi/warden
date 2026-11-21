@@ -95,6 +95,19 @@ object Rules {
         reset(if (touchedGlobal) "" else uid.toString())
     }
 
+    /**
+     * The rule for [domain] (and its subdomains) in every app: Allow outranks blocklists, Block adds to
+     * them, null removes it so the lists decide. Per-app rules still win, as always.
+     */
+    fun setEverywhere(domain: String, verdict: Verdict?) {
+        val key = GLOBAL + domain
+        prefs.edit().apply { if (verdict == null) remove(key) else putString(key, verdict.name) }.apply()
+        _domains.update { if (verdict == null) it - key else it + (key to verdict) }
+        reset("") // touches every app
+    }
+
+    fun everywhere(domain: String): Verdict? = _domains.value[GLOBAL + domain]
+
     /** Delete one stored rule by its key ("<uid>:<domain>" or "*:<domain>"). */
     fun remove(key: String) {
         prefs.edit().remove(key).apply()

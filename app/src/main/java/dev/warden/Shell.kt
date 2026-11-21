@@ -99,6 +99,9 @@ import dev.warden.engine.WardenVpnService
 import dev.warden.logs.LogScreen
 import dev.warden.map.MapScreen
 import dev.warden.settings.SettingsScreen
+import dev.warden.settings.VpnScreen
+import dev.warden.settings.BlocklistsScreen
+import dev.warden.map.ipCountry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
@@ -181,6 +184,17 @@ internal fun Shell(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit, onRep
                             blocklistsOn = lists.values.any { it.enabled },
                             onOpenSettings = { tab = Tab.Settings },
                             onOpenApp = openFrom,
+                            vpnScreen = { back ->
+                                VpnScreen(
+                                    stringResource(R.string.tab_home),
+                                    { ip -> ipCountry(context, ip) },
+                                    apps::label,
+                                    apps::icon,
+                                    back,
+                                )
+                            },
+                            blocklistScreen = { back -> BlocklistsScreen(stringResource(R.string.tab_home), back) },
+                            vpnCountry = { ip -> ipCountry(context, ip) },
                         )
                         Tab.Apps -> AppsScreen(events, apps::label, apps::icon, openApp, {
                             openApp = it

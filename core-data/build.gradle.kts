@@ -16,6 +16,7 @@ ksp {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     api(project(":core-engine"))
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

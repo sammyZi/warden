@@ -175,17 +175,10 @@ private fun SettingsHome(
             }
         }
 
-        Section(stringResource(R.string.settings_blocklists), note = stringResource(R.string.settings_blocklists_note)) {
-            Blocklists.catalog.forEachIndexed { i, source ->
-                if (i > 0) HorizontalDivider(color = c.outline)
-                BlocklistRow(source, lists.getValue(source.id))
-            }
-        }
+        // Blocklists have their own screen, from Home's tools.
 
         Section(stringResource(R.string.protection_title), note = stringResource(R.string.protection_note)) {
-            LockdownRow()
-            HorizontalDivider(color = c.outline)
-            WireGuardRow()
+            LockdownRow() // Your VPN has its own screen, from Home's tools
         }
 
         Section(stringResource(R.string.dns_title), note = stringResource(R.string.dns_note)) {
@@ -281,7 +274,7 @@ private fun Credits() {
 
 /** One list: name, what state it's in, and its switch. The status line retries or refreshes on tap. */
 @Composable
-private fun BlocklistRow(source: BlocklistSource, state: BlocklistState) {
+internal fun BlocklistRow(source: BlocklistSource, state: BlocklistState) {
     val c = Warden.colors
     Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -305,7 +298,39 @@ private fun BlocklistRow(source: BlocklistSource, state: BlocklistState) {
         }
         if (state.enabled || state.failed) RefreshButton(source.name, state.busy) { Blocklists.refresh(source.id) }
         WardenSwitch(state.enabled, { Blocklists.setEnabled(source.id, it) }, contentDescription = source.name)
+        if (source.custom) ItemMenu(source.name, onRename = null, onDelete = { Blocklists.removeCustom(source.id) })
     }
+}
+
+/** Add a list by URL: a hosts file or one domain per line, fetched over https like the built-in ones. */
+@Composable
+internal fun AddListButton() {
+    val c = Warden.colors
+    var open by rememberSaveable { mutableStateOf(false) }
+    WardenButton(stringResource(R.string.settings_bl_add), { open = true }, Modifier.fillMaxWidth(), kind = ButtonKind.Tonal)
+    if (!open) return
+    var name by rememberSaveable { mutableStateOf("") }
+    var url by rememberSaveable { mutableStateOf("https://") }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text(stringResource(R.string.settings_bl_add_title), style = Warden.type.title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                Field(R.string.settings_bl_url, url, { url = it }, R.string.settings_bl_url_hint)
+                Field(R.string.wg_f_name, name, { name = it }, R.string.wg_f_optional)
+                error?.let { Text(it, style = Warden.type.label, color = c.blocked) }
+            }
+        },
+        confirmButton = {
+            WardenButton(stringResource(R.string.wg_manual_save), {
+                error = runCatching { Blocklists.addCustom(name, url) }.exceptionOrNull()?.message
+                if (error == null) open = false
+            })
+        },
+        dismissButton = { WardenButton(stringResource(R.string.settings_cancel), { open = false }, kind = ButtonKind.Text) },
+        containerColor = c.surface,
+    )
 }
 
 /** Update one list now. Spins while that list downloads. */

@@ -1,5 +1,18 @@
 package dev.warden.logs
 
+import kotlinx.coroutines.launch
+import java.util.Locale
+import java.text.SimpleDateFormat
+import dev.warden.data.History
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.Icon
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.widget.Toast
 import dev.warden.design.ScreenTitle
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -92,7 +105,10 @@ fun LogScreen(
     // Title, live line and filters stay put; only the stream below scrolls.
     Column(modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = Spacing.xl).padding(top = Spacing.s)) {
-            ScreenTitle(stringResource(R.string.log_title))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ScreenTitle(stringResource(R.string.log_title), Modifier.weight(1f))
+                ExportButton(appLabel)
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 LiveDot(running)
                 Text(
@@ -229,4 +245,37 @@ internal fun DomainRuleChips(uid: Int, domain: String, modifier: Modifier = Modi
         { Rules.choose(uid, domain, DomainChoice.entries[it]) },
         modifier,
     )
+}
+
+/**
+ * Saves the whole history (up to 30 days) as a CSV file where the user picks. A PCAP isn't offered:
+ * Warden never records packets, only who connected where, so a capture would have to be made up.
+ */
+@Composable
+private fun ExportButton(appLabel: (Int) -> String) {
+    val c = Warden.colors
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val rows = runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { History.exportCsv(it, appLabel) }
+            }.getOrNull()
+            val text = if (rows == null) {
+                context.getString(R.string.log_export_failed)
+            } else {
+                context.resources.getQuantityString(R.plurals.log_exported, rows, rows)
+            }
+            Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+        }
+    }
+    Box(
+        Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button) {
+            save.launch("warden-log-" + SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) + ".csv")
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(painterResource(DesignR.drawable.ph_export), stringResource(R.string.log_export), Modifier.size(24.dp), tint = c.text)
+    }
 }

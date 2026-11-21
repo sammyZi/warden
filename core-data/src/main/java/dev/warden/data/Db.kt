@@ -50,6 +50,9 @@ data class AppTotals(
 
 data class DomainCount(val domain: String, val count: Int, val blocked: Int)
 
+/** A domain Warden blocked: how often, and how many apps tried it. */
+data class BlockedDomain(val domain: String, val count: Int, val apps: Int, val lastTime: Long)
+
 @Dao
 interface ConnectionDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -101,6 +104,16 @@ interface ConnectionDao {
 
     @Query("SELECT DISTINCT domain FROM connections WHERE time >= :since AND domain IS NOT NULL")
     fun domains(since: Long): Flow<List<String>>
+
+    @Query(
+        """SELECT domain, COUNT(*) AS count, COUNT(DISTINCT uid) AS apps, MAX(time) AS lastTime FROM connections
+           WHERE blocked = 1 AND time >= :since AND domain IS NOT NULL GROUP BY domain ORDER BY count DESC LIMIT :limit""",
+    )
+    fun blockedDomains(since: Long, limit: Int): Flow<List<BlockedDomain>>
+
+    /** One page of every saved row, oldest first, for export. */
+    @Query("SELECT * FROM connections WHERE id > :after ORDER BY id LIMIT :limit")
+    suspend fun page(after: Long, limit: Int): List<ConnectionRow>
 
     @Query("DELETE FROM connections WHERE time < :before")
     suspend fun deleteBefore(before: Long)

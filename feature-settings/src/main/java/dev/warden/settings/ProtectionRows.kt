@@ -1,6 +1,7 @@
 package dev.warden.settings
 
 import android.net.Uri
+import androidx.compose.runtime.produceState
 import dev.warden.rules.VpnServer
 import androidx.compose.runtime.remember
 import androidx.compose.material3.DropdownMenuItem
@@ -99,7 +100,7 @@ internal fun UpdateRow() {
 
 /** Saved WireGuard servers (one per country, say): pick the one "Your VPN" apps use, add, remove. */
 @Composable
-internal fun WireGuardRow() {
+internal fun WireGuardRow(countryOf: suspend (ip: String) -> String?) {
     val c = Warden.colors
     val context = LocalContext.current
     val servers by Routing.servers.collectAsState()
@@ -127,7 +128,7 @@ internal fun WireGuardRow() {
     ) {
         IconBadge(DesignR.drawable.ph_lock_key_light, c.palette[1])
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.wg_title), style = Warden.type.body)
+            Text(stringResource(R.string.vpn_servers), style = Warden.type.body)
             Text(
                 stringResource(if (servers.isEmpty()) R.string.wg_none else R.string.wg_pick),
                 style = Warden.type.label,
@@ -165,9 +166,11 @@ internal fun WireGuardRow() {
             }
             Column(Modifier.weight(1f)) {
                 Text(server.name, style = Warden.type.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(server.config.endpoint, style = Warden.type.label, color = c.muted, maxLines = 1)
+                // Where the server is, from its IP (offline); a hostname or anycast address shows as is.
+                val iso by produceState<String?>(null, server.config.endpoint) { value = countryOf(server.config.endpoint) }
+                Text(iso?.let(::flagAndCountry) ?: server.config.endpoint, style = Warden.type.label, color = c.muted, maxLines = 1)
             }
-            ServerMenu(server.name, onRename = { renaming = server.id }, onDelete = { removing = server.id })
+            ItemMenu(server.name, onRename = { renaming = server.id }, onDelete = { removing = server.id })
         }
     }
     if (folds) {
@@ -176,13 +179,6 @@ internal fun WireGuardRow() {
             { showAll = !showAll },
             kind = ButtonKind.Text,
         )
-    }
-    if (servers.isNotEmpty()) {
-        val all by Routing.vpnForAll.collectAsState()
-        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.wg_all), Modifier.weight(1f), style = Warden.type.body)
-            WardenSwitch(all, Routing::setVpnForAll, contentDescription = stringResource(R.string.wg_all))
-        }
     }
     error?.let { Text(stringResource(R.string.wg_error, it), style = Warden.type.label, color = c.blocked) }
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
@@ -230,9 +226,9 @@ private fun displayName(context: Context, uri: Uri): String = runCatching {
     }
 }.getOrNull().orEmpty()
 
-/** ⋮ on a saved server: rename it or delete it. */
+/** ⋮ on a saved item (a server, a custom list): rename it (when [onRename] is given) or delete it. */
 @Composable
-private fun ServerMenu(name: String, onRename: () -> Unit, onDelete: () -> Unit) {
+internal fun ItemMenu(name: String, onRename: (() -> Unit)?, onDelete: () -> Unit) {
     val c = Warden.colors
     var open by remember { mutableStateOf(false) }
     Box {
@@ -248,13 +244,15 @@ private fun ServerMenu(name: String, onRename: () -> Unit, onDelete: () -> Unit)
             )
         }
         DropdownMenu(open, { open = false }, containerColor = c.surface) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.wg_rename), style = Warden.type.body) },
-                onClick = {
-                    open = false
-                    onRename()
-                },
-            )
+            if (onRename != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.wg_rename), style = Warden.type.body) },
+                    onClick = {
+                        open = false
+                        onRename()
+                    },
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.wg_delete), style = Warden.type.body, color = c.blocked) },
                 onClick = {
@@ -286,3 +284,17 @@ private fun RenameDialog(server: VpnServer, onDone: () -> Unit) {
 }
 
 private const val FOLD_AFTER = 3 // up to this many servers are always listed
+
+/** "🇸🇬 Singapore" from "SG", in the phone's language. */
+private fun flagAndCountry(iso: String): String = listOfNotNull(flagOf(iso), countryName(iso)).joinToString("  ")
+
+/** Flag emoji from a two-letter country code; null for anything else. */
+internal fun flagOf(iso: String): String? {
+    val code = iso.uppercase()
+    if (code.length != 2 || !code.all { it in 'A'..'Z' }) return null
+    return code.map { String(Character.toChars(REGIONAL_A + (it - 'A'))) }.joinToString("")
+}
+
+internal fun countryName(iso: String): String = java.util.Locale.Builder().setRegion(iso).build().displayCountry.ifEmpty { iso }
+
+private const val REGIONAL_A = 0x1F1E6

@@ -88,6 +88,9 @@ fun DashboardScreen(
     onOpenApp: (Int) -> Unit,
     blocklistsOn: Boolean,
     onOpenSettings: () -> Unit,
+    vpnScreen: @Composable (onBack: () -> Unit) -> Unit,
+    blocklistScreen: @Composable (onBack: () -> Unit) -> Unit,
+    vpnCountry: suspend (ip: String) -> String?,
     modifier: Modifier = Modifier,
 ) {
     val c = Warden.colors
@@ -108,6 +111,14 @@ fun DashboardScreen(
         },
         label = "tool",
     ) { open ->
+        if (open == Tool.Vpn) {
+            vpnScreen { tool = null }
+            return@AnimatedContent
+        }
+        if (open == Tool.Blocklists) {
+            blocklistScreen { tool = null }
+            return@AnimatedContent
+        }
         if (open != null) {
             ToolScreen(open, range, appLabel, appIcon, onOpenApp, onBack = { tool = null })
             return@AnimatedContent
@@ -132,7 +143,7 @@ fun DashboardScreen(
             if (!blocklistsOn) {
                 // Nothing is blocked until a list is on; say so where the zero shows up.
                 Spacer(Modifier.height(Spacing.m))
-                Tile(Modifier.fillMaxWidth(), onClick = onOpenSettings) {
+                Tile(Modifier.fillMaxWidth(), onClick = { tool = Tool.Blocklists }) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
                         IconBadge(DesignR.drawable.ph_prohibit, c.blocked)
                         Column(Modifier.weight(1f)) {
@@ -193,7 +204,7 @@ fun DashboardScreen(
             Spacer(Modifier.height(Spacing.xl))
             SectionLabel(stringResource(R.string.dashboard_tools))
             Spacer(Modifier.height(Spacing.s))
-            ToolsGrid(range) { tool = it }
+            ToolsGrid(range, vpnCountry) { tool = it }
             Spacer(Modifier.height(Spacing.xl))
             SectionLabel(
                 stringResource(R.string.dashboard_activity) + " · " + stringResource(

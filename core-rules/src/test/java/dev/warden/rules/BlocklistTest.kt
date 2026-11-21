@@ -39,4 +39,12 @@ class BlocklistTest {
         assertEquals(3, n)
         assertEquals(setOf("a.com", "b.com"), into)
     }
+
+    @Test fun customListsNeedHttpsWithAHost() {
+        assertTrue(isValidListUrl("https://example.com/hosts.txt"))
+        assertTrue(isValidListUrl("  https://raw.githubusercontent.com/a/b/main/list  "))
+        assertFalse(isValidListUrl("http://example.com/hosts.txt"))
+        assertFalse(isValidListUrl("https://"))
+        assertFalse(isValidListUrl("example.com/list"))
+    }
 }

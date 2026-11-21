@@ -1,5 +1,10 @@
 package dev.warden.data
 
+import kotlinx.coroutines.withContext
+import java.util.Locale
+import java.util.Date
+import java.text.SimpleDateFormat
+import java.io.OutputStream
 import android.content.Context
 import android.os.PowerManager
 import androidx.room.Room
@@ -148,6 +153,45 @@ object History {
 
     fun appDomains(uid: Int, range: Range): Flow<List<DomainCount>> = ticking { dao.appDomains(uid, start(range)) }.whileVisible()
 
+    /** Domains Warden blocked in [range], most often first. */
+    fun blockedDomains(range: Range, limit: Int = BLOCKED_ROWS): Flow<List<BlockedDomain>> =
+        ticking { dao.blockedDomains(start(range), limit) }.whileVisible()
+
+    /**
+     * Writes all saved history (up to 30 days) to [out] as CSV, oldest first, a page at a time so a large
+     * history never sits in memory at once. Returns the number of rows. Metadata only: there is no payload.
+     */
+    suspend fun exportCsv(out: OutputStream, appLabel: (Int) -> String): Int = withContext(Dispatchers.IO) {
+        val time = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
+        var rows = 0
+        out.bufferedWriter().use { w ->
+            w.write("time,app,uid,kind,domain,destination,blocked,bytes_up,bytes_down,latency_ms,failed\n")
+            var after = 0L
+            while (true) {
+                val page = dao.page(after, EXPORT_PAGE)
+                if (page.isEmpty()) break
+                page.forEach { r ->
+                    val cells = listOf(
+                        time.format(Date(r.time)), appLabel(r.uid), r.uid.toString(), r.kind, r.domain.orEmpty(), r.target,
+                        r.blocked.toString(), r.bytesUp.toString(), r.bytesDown.toString(), r.latencyMs?.toString().orEmpty(),
+                        r.failed.toString(),
+                    )
+                    w.write(cells.joinToString(",", transform = ::csvCell))
+                    w.write("\n")
+                }
+                rows += page.size
+                after = page.last().id
+            }
+        }
+        rows
+    }
+
+    /** Quoted when it holds a comma, quote or line break; a leading = + - @ is defused for spreadsheets. */
+    internal fun csvCell(v: String): String {
+        val safe = if (v.isNotEmpty() && v[0] in "=+-@") "'$v" else v
+        return if (safe.any { it in CSV_SPECIAL }) "\"" + safe.replace("\"", "\"\"") + "\"" else safe
+    }
+
     /** Every distinct domain contacted in [range] (for tracker summaries). */
     fun domains(range: Range): Flow<List<String>> = ticking { dao.domains(start(range)) }.whileVisible()
 
@@ -183,4 +227,7 @@ object History {
     private const val KEEP_ROWS = 200_000
     private const val RECENT_ROWS = 1_000
     private const val MAP_ROWS = 5_000
+    private const val BLOCKED_ROWS = 100
+    private const val EXPORT_PAGE = 5_000
+    private const val CSV_SPECIAL = ",\"\n\r" // a cell with any of these is quoted
 }
