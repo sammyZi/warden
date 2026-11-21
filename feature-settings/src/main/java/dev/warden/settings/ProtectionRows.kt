@@ -148,7 +148,11 @@ internal fun WireGuardRow() {
             Icon(painterResource(DesignR.drawable.ph_scan), stringResource(R.string.wg_scan), Modifier.size(24.dp), tint = c.text)
         }
     }
-    servers.forEach { server ->
+    // A long list folds to the ticked server, so the card stays short; "Show all" opens the rest.
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    val folds = servers.size > FOLD_AFTER
+    val shown = if (folds && !showAll) servers.filter { it.id == selected } else servers
+    shown.forEach { server ->
         val on = server.id == selected
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -165,6 +169,13 @@ internal fun WireGuardRow() {
             }
             ServerMenu(server.name, onRename = { renaming = server.id }, onDelete = { removing = server.id })
         }
+    }
+    if (folds) {
+        WardenButton(
+            if (showAll) stringResource(R.string.wg_show_less) else stringResource(R.string.wg_show_all, servers.size),
+            { showAll = !showAll },
+            kind = ButtonKind.Text,
+        )
     }
     if (servers.isNotEmpty()) {
         val all by Routing.vpnForAll.collectAsState()
@@ -273,3 +284,5 @@ private fun RenameDialog(server: VpnServer, onDone: () -> Unit) {
         containerColor = c.surface,
     )
 }
+
+private const val FOLD_AFTER = 3 // up to this many servers are always listed

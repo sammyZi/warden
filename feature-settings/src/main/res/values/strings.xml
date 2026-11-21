@@ -113,6 +113,8 @@
     <string name="wg_remove_title">Delete %1$s?</string>
     <string name="wg_menu_for">Options for %1$s</string>
     <string name="wg_rename">Rename</string>
+    <string name="wg_show_all">Show all (%1$d)</string>
+    <string name="wg_show_less">Show less</string>
     <string name="wg_rename_save">Save</string>
     <string name="wg_delete">Delete</string>
     <string name="wg_remove_body">Deletes its key from this phone.</string>
