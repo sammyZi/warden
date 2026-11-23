@@ -35,13 +35,20 @@
 
 **Block what you want**
 - **Cut any app off the internet**, separately on Wi-Fi and mobile data. Every installed app is listed, so you can block one before it ever connects.
-- **Block or allow single domains**, for one app or for every app, straight from the live log, the app's page or the map.
-- **Blocklists** for ads, trackers and malware (HaGeZi, StevenBlack, OISD), downloaded and refreshed on your phone.
+- **Lockdown**: one tap on Home and only the apps you allow can go online, including apps installed later. The notification says when it's on.
+- **Block or allow single domains**, for one app or for every app, straight from the live log, the app's page, the map or the blocked list.
+- **Blocklists** for ads, trackers and malware (HaGeZi, StevenBlack, OISD), or **add your own** by https address. Downloaded and refreshed on your phone.
+- **See what was blocked**: every blocked domain with how often, how many apps tried it and when, for today, 7 or 30 days. Allow or block any of them everywhere in one tap.
 - **Skip Warden** for apps you trust, so their traffic doesn't go through it at all.
 - **No sneaking around it**: apps can't dodge your rules with their own DNS servers, DNS-over-HTTPS or DNS-over-TLS.
 
+**Route apps your way**
+- **Tor, built in**: send any app through Tor with no other app to install. Its lookups go through Tor too, and it stays offline rather than going direct if Tor isn't up.
+- **Your own VPN (WireGuard)**: add servers from a provider's `.conf` file, by scanning its QR code, or by typing the details in. Keep one per country and switch with a tap; flags show where each server is.
+- **Per app or for everything**: pick Direct, Tor or Your VPN for each app, or send every app through your VPN. The VPN screen shows which apps go where.
+
 **See what your apps do**
-- **Live log** of every lookup and connection, with the app, time, and whether it was blocked.
+- **Live log** of every lookup and connection, with the app, time, and whether it was blocked. **Export** it as CSV to share or save.
 - **Where it went**: a 3D globe of the countries your traffic reached, filtered by app, time span, blocked or trackers. CDN edges are labelled as such.
 - **Per-app pages**: connections, domains, trackers, recent activity, data used and a shortcut to that app on the map.
 - **Tracker companies**: "your apps contacted 26 trackers from 9 companies today", grouped by company and purpose.
@@ -54,6 +61,7 @@
 - **Private DNS warning** when Android's own setting would bypass Warden, with a link to fix it.
 - **Survives network changes**, rebuilding itself when you move between IPv4-only and IPv6 networks.
 - **Quick Settings tile** to turn protection on or off from the notification shade.
+- **Update alerts**: a daily check for a new release on GitHub (switch it off in Settings).
 
 **Built to be light and private**
 - No account, no analytics, no ads, no cloud. Nothing about your traffic leaves the phone.
@@ -79,6 +87,7 @@ flowchart LR
     T --> F[firestack engine<br/>TCP/UDP + DNS]
     F -->|flow / DNS query| W[Warden rules<br/>per-app, per-domain, blocklists]
     W -->|allow| N[Internet]
+    W -->|Tor or your VPN| P[Tor / WireGuard] --> N
     W -->|block| X[Refused / sinkholed]
     F --> L[Live log, apps, globe]
 ```
@@ -89,7 +98,8 @@ flowchart LR
    DNS, and asks Warden about every DNS query and every new connection.
 3. Warden decides with one precedence order: your per-app rule for that domain, then the app's
    Wi-Fi/mobile rule, then your global rule, then your enabled blocklists, then allow.
-4. Blocked lookups are sinkholed and blocked connections refused. Everything else goes out as normal.
+4. Blocked lookups are sinkholed and blocked connections refused. Everything else goes out as normal,
+   or through Tor or your WireGuard server for apps you route there.
 
 ## Privacy promise
 
@@ -107,7 +117,10 @@ Full details: [Privacy policy](PRIVACY.md) · [Terms of use](TERMS.md)
 ## Honest limitations
 
 - **No HTTPS inspection**, by design. Warden sees destinations, not content.
-- **One VPN at a time.** Android allows a single VPN app, so Warden can't run alongside another VPN.
+- **One VPN at a time.** Android allows a single VPN app, so Warden can't run alongside another VPN app.
+  Use **Your VPN** inside Warden instead: it supports WireGuard (not OpenVPN).
+- **Tor is slower** than a direct connection or a VPN, and the first connection can take half a minute.
+  It carries TCP only, so a Tor app's UDP (mostly QUIC) is refused and the app falls back to TCP.
 - **Encrypted Client Hello (ECH)** will gradually hide the domain in TLS handshakes; DNS-based
   blocking still works, but some connections will only show an IP.
 - **Strict Private DNS** (a hostname set in system settings) bypasses Warden's DNS. The app detects
@@ -129,7 +142,7 @@ are mature, capable tools, and Warden stands on Rethink's engine. Warden's focus
 
 ## Build
 
-Requirements: JDK 17, Android SDK with platform 37.
+Requirements: JDK 17, Android SDK with platform 37.2 (built-in Tor needs it).
 
 ```bash
 ./gradlew assembleDebug        # debug APK
@@ -151,7 +164,7 @@ Good first issues are listed in [docs/good-first-issues.md](docs/good-first-issu
 - Screen-off blocking and new-app alerts
 - Home-screen widget and scheduled rules
 - Backup and restore of rules
-- Optional per-app Tor routing through Orbot
+- A different VPN server per app
 
 ## License
 
