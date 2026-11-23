@@ -63,11 +63,13 @@
 
 | Home | Apps | App detail |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/home.png" width="240" alt="Home: protection, DNS, today's stats and tools"> | <img src="docs/screenshots/apps.png" width="240" alt="Apps: search, filters and every app's activity"> | <img src="docs/screenshots/detail.png" width="240" alt="App detail: grade, map, stats, data and access"> |
+| <img src="docs/screenshots/home.jpg" width="240" alt="Home: protection, DNS, lockdown, today's stats and tools"> | <img src="docs/screenshots/apps.jpg" width="240" alt="Apps: search, filters and every app's activity"> | <img src="docs/screenshots/detail.jpg" width="240" alt="App detail: grade, map, stats, data and access"> |
 | **Where it went** | **Live log** | **Data** |
-| <img src="docs/screenshots/map.png" width="240" alt="Globe of where traffic went, by country"> | <img src="docs/screenshots/log.png" width="240" alt="Live log of lookups and connections"> | <img src="docs/screenshots/data.png" width="240" alt="Data used per app, Wi-Fi and mobile"> |
-| **Trackers** | **Report card** | **Settings** |
-| <img src="docs/screenshots/trackers.png" width="240" alt="Tracking companies and their domains"> | <img src="docs/screenshots/report.png" width="240" alt="Shareable privacy report card"> | <img src="docs/screenshots/settings.png" width="240" alt="Settings: rules, blocklists, DNS"> |
+| <img src="docs/screenshots/map.jpg" width="240" alt="Globe of where traffic went, by country"> | <img src="docs/screenshots/log.jpg" width="240" alt="Live log of lookups and connections, with export"> | <img src="docs/screenshots/data.jpg" width="240" alt="Data used per app, Wi-Fi and mobile"> |
+| **Your VPN** | **Blocklists** | **Trackers** |
+| <img src="docs/screenshots/vpn.jpg" width="240" alt="Your VPN: server, apps through the VPN and through Tor"> | <img src="docs/screenshots/blocklists.jpg" width="240" alt="Blocklists, custom lists and what was blocked"> | <img src="docs/screenshots/trackers.png" width="240" alt="Tracking companies and their domains"> |
+| **Report card** | **Settings** | |
+| <img src="docs/screenshots/report.png" width="240" alt="Shareable privacy report card"> | <img src="docs/screenshots/settings.jpg" width="240" alt="Settings: rules, lockdown, DNS"> | |
 
 ## How it works
 
