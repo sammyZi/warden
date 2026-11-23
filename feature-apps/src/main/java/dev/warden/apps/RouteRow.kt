@@ -1,5 +1,8 @@
 package dev.warden.apps
 
+import dev.warden.design.WardenButton
+import dev.warden.design.ButtonKind
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -68,9 +71,19 @@ internal fun RouteRow(uid: Int, name: String) {
 private fun TorStatus(name: String) {
     val state by BuiltInTor.state.collectAsState()
     val running by Engine.running.collectAsState()
+    val context = LocalContext.current
     when {
         !running -> Note(stringResource(R.string.tor_when_on), warn = false)
         state == TorState.On -> Note(stringResource(R.string.tor_on), warn = false)
+        state == TorState.Failed -> {
+            Note(stringResource(R.string.tor_failed, name), warn = true)
+            WardenButton(
+                stringResource(R.string.tor_retry),
+                { BuiltInTor.retry(context) },
+                Modifier.fillMaxWidth(),
+                kind = ButtonKind.Tonal,
+            )
+        }
         else -> Note(stringResource(R.string.tor_connecting, name), warn = true)
     }
 }

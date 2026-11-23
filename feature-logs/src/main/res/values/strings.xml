@@ -14,8 +14,12 @@
     <string name="rule_default">Default</string>
     <string name="rule_allow_here">Allow for this app</string>
     <string name="rule_block_here">Block for this app</string>
+    <string name="rule_allow_everywhere">Allow everywhere</string>
     <string name="rule_block_everywhere">Block everywhere</string>
     <string name="log_export">Export history as CSV</string>
+    <string name="log_export_share">Share a copy</string>
+    <string name="log_export_save">Save to device</string>
+    <string name="log_export_busy">Preparing the file</string>
     <string name="log_export_failed">Couldn\'t save the file</string>
     <plurals name="log_exported">
         <item quantity="one">Saved %1$d row</item>

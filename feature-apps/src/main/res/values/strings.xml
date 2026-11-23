@@ -54,6 +54,7 @@
     <string name="rule_default">Default</string>
     <string name="rule_allow_here">Allow for this app</string>
     <string name="rule_block_here">Block for this app</string>
+    <string name="rule_allow_everywhere">Allow everywhere</string>
     <string name="rule_block_everywhere">Block everywhere</string>
     <string name="apps_trackers">Trackers</string>
     <string name="apps_trackers_none">No known trackers in this app\'s recent traffic.</string>
@@ -137,4 +138,6 @@
     <string name="tor_on">Through Tor. Websites see a Tor address, not yours.</string>
     <string name="tor_connecting">Connecting to Tor… %1$s stays offline until it\'s connected. The first time can take half a minute.</string>
     <string name="tor_when_on">Tor starts when protection is on.</string>
+    <string name="tor_failed">Tor couldn\'t start, so %1$s is offline. Try again, or set it to Direct.</string>
+    <string name="tor_retry">Try again</string>
 </resources>

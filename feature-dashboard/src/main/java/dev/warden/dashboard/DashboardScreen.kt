@@ -389,7 +389,8 @@ private fun LockdownButton(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painterResource(DesignR.drawable.ph_lock_simple),
+            // Shape shows the state, not only colour: open lock when off, closed and filled when on.
+            painterResource(if (on) DesignR.drawable.ph_lock_simple_fill else DesignR.drawable.ph_lock_simple_open),
             stringResource(if (on) R.string.dashboard_lockdown_on else R.string.dashboard_lockdown_off),
             Modifier.size(24.dp),
             tint = if (on) c.blocked else c.muted,

@@ -170,4 +170,13 @@
     <string name="bl_rule_default">Default</string>
     <string name="bl_rule_allow">Allow everywhere</string>
     <string name="bl_rule_block">Block everywhere</string>
+    <string name="err_not_wireguard">this isn\'t a WireGuard config</string>
+    <string name="err_no_peer">the config has no [Peer] section</string>
+    <string name="err_no_address">the config has no Address</string>
+    <string name="err_bad_key">%1$s is missing or isn\'t a valid key</string>
+    <string name="err_no_endpoint">the config has no Endpoint</string>
+    <string name="err_no_port">the server address needs a port, like vpn.example.com:51820</string>
+    <string name="err_ipv6">an IPv6 server address goes in brackets, like [2001:db8::1]:51820</string>
+    <string name="err_not_https">Needs a full https:// address</string>
+    <string name="err_already_added">That list is already added</string>
 </resources>

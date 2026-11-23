@@ -305,6 +305,7 @@ internal fun BlocklistRow(source: BlocklistSource, state: BlocklistState) {
 /** Add a list by URL: a hosts file or one domain per line, fetched over https like the built-in ones. */
 @Composable
 internal fun AddListButton() {
+    val context = LocalContext.current
     val c = Warden.colors
     var open by rememberSaveable { mutableStateOf(false) }
     WardenButton(stringResource(R.string.settings_bl_add), { open = true }, Modifier.fillMaxWidth(), kind = ButtonKind.Tonal)
@@ -324,7 +325,8 @@ internal fun AddListButton() {
         },
         confirmButton = {
             WardenButton(stringResource(R.string.wg_manual_save), {
-                error = runCatching { Blocklists.addCustom(name, url) }.exceptionOrNull()?.message
+                error = runCatching { Blocklists.addCustom(name, url) }.exceptionOrNull()
+                    ?.let { problemText(context, it, context.getString(R.string.err_not_https)) }
                 if (error == null) open = false
             })
         },

@@ -46,6 +46,13 @@ class RoutingTest {
         }
     }
 
+    @Test fun ipv6EndpointsNeedBrackets() {
+        assertEquals("2001:db8::1", WireGuard.parse(WireGuard.conf(key, "10.64.0.2/32", "", key, "[2001:db8::1]:51820")).endpoint)
+        assertThrows(IllegalArgumentException::class.java) {
+            WireGuard.parse(WireGuard.conf(key, "10.64.0.2/32", "", key, "2001:db8::1"))
+        }
+    }
+
     @Test fun lockdownLeavesAndroidItselfOnline() {
         assertTrue(AppRules.isCore(-1))
         assertTrue(AppRules.isCore(1000))

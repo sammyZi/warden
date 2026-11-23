@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 enum class Verdict { Allow, Block }
 
 /** What the user picked for one domain, as seen from one app. */
-enum class DomainChoice { Default, AllowHere, BlockHere, BlockEverywhere }
+enum class DomainChoice { Default, AllowHere, BlockHere, AllowEverywhere, BlockEverywhere }
 
 /**
  * Custom domain rules plus the one place that decides. Precedence (spec):
@@ -73,20 +73,28 @@ object Rules {
         return when (rules["$uid:$domain"]) {
             Verdict.Block -> DomainChoice.BlockHere
             Verdict.Allow -> DomainChoice.AllowHere
-            null -> if (rules["$GLOBAL$domain"] == Verdict.Block) DomainChoice.BlockEverywhere else DomainChoice.Default
+            null -> when (rules["$GLOBAL$domain"]) {
+                Verdict.Block -> DomainChoice.BlockEverywhere
+                Verdict.Allow -> DomainChoice.AllowEverywhere
+                null -> DomainChoice.Default
+            }
         }
     }
 
     fun choose(uid: Int, domain: String, choice: DomainChoice) {
         val app = "$uid:$domain"
         val global = "$GLOBAL$domain"
+        // A per-app choice only touches this app's rule (it outranks any global one anyway), so it never
+        // erases an "everywhere" rule set elsewhere. Default undoes whatever the chips were showing.
+        val current = _domains.value
         val changes = when (choice) {
-            DomainChoice.Default -> mapOf(app to null, global to null)
-            DomainChoice.AllowHere -> mapOf(app to Verdict.Allow, global to null)
-            DomainChoice.BlockHere -> mapOf(app to Verdict.Block, global to null)
+            DomainChoice.Default -> if (app in current) mapOf(app to null) else mapOf(global to null)
+            DomainChoice.AllowHere -> mapOf(app to Verdict.Allow)
+            DomainChoice.BlockHere -> mapOf(app to Verdict.Block)
+            DomainChoice.AllowEverywhere -> mapOf(app to null, global to Verdict.Allow)
             DomainChoice.BlockEverywhere -> mapOf(app to null, global to Verdict.Block)
         }
-        val touchedGlobal = choice == DomainChoice.BlockEverywhere || global in _domains.value
+        val touchedGlobal = global in changes
         prefs.edit().apply { changes.forEach { (k, v) -> if (v == null) remove(k) else putString(k, v.name) } }.apply()
         _domains.update { current ->
             current.toMutableMap().apply { changes.forEach { (k, v) -> if (v == null) remove(k) else put(k, v) } }

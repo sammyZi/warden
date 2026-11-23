@@ -12,6 +12,7 @@ class CsvTest {
 
     @Test fun formulasAreDefused() {
         assertEquals("'=HYPERLINK(1)", History.csvCell("=HYPERLINK(1)"))
-        assertEquals("'+1", History.csvCell("+1"))
+        assertEquals("'+cmd", History.csvCell("+cmd"))
+        assertEquals("-1", History.csvCell("-1")) // the unknown-owner uid stays a number
     }
 }

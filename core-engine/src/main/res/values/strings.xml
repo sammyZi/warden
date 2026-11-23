@@ -2,6 +2,7 @@
     <string name="engine_session">Warden</string>
     <string name="engine_channel">Protection status</string>
     <string name="engine_notif_title">Warden is on</string>
+    <string name="engine_notif_lockdown">Lockdown is on</string>
     <string name="engine_notif_text">Watching your apps\' connections, on this phone only.</string>
     <plurals name="engine_notif_blocked">
         <item quantity="one">%d connection blocked since Warden started.</item>

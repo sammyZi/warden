@@ -1,5 +1,6 @@
 package dev.warden.settings
 
+import androidx.compose.runtime.key
 import dev.warden.rules.Verdict
 import dev.warden.design.ChoiceChips
 import androidx.compose.animation.animateContentSize
@@ -117,12 +118,13 @@ private fun BlockedDomains() {
         )
         val most = rows.first().count.coerceAtLeast(1)
         val time = remember { DateFormat.getTimeInstance(DateFormat.SHORT) }
-        rows.forEach { d ->
+        // key(): open state follows the domain as the list re-sorts every minute.
+        rows.forEach { d -> key(d.domain) {
             HorizontalDivider(color = c.outline)
             val rule = remember(rules, d.domain) { Rules.everywhere(d.domain) }
             val allowed = rule == Verdict.Allow
             // Tap to open the same rule chips as the live log; a domain here spans apps, so they're global.
-            var open by rememberSaveable(d.domain) { mutableStateOf(false) }
+            var open by rememberSaveable { mutableStateOf(false) }
             Column(
                 Modifier.fillMaxWidth().animateContentSize().clickable { open = !open }.padding(vertical = Spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
@@ -151,7 +153,7 @@ private fun BlockedDomains() {
                 }
                 if (open) GlobalRuleChips(d.domain, rule, Modifier.padding(top = Spacing.xs))
             }
-        }
+        } }
     }
 }
 

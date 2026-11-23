@@ -41,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -196,18 +197,23 @@ class WardenVpnService : VpnService(), Bridge {
         tor = CoroutineScope(Dispatchers.Default).launch {
             BuiltInTor.state.collect { useTor(it) }
         }
-        // The notification's blocked count: redrawn at most every 10s, and not at all while the screen is
-        // off (nobody sees it then; each redraw costs System UI work).
-        counter = CoroutineScope(Dispatchers.Default).launch {
-            val power = getSystemService(PowerManager::class.java)
-            var shown = 0
-            while (true) {
-                delay(NOTIFY_EVERY_MS)
-                val now = Engine.blocked.get()
-                if (now != shown && power.isInteractive) {
-                    shown = now
-                    getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(now))
-                }
+        counter = watchNotification()
+    }
+
+    /**
+     * The notification's blocked count: redrawn at most every 10s, and not at all while the screen is
+     * off (nobody sees it then; each redraw costs System UI work). Lockdown on/off redraws at once.
+     */
+    private fun watchNotification() = CoroutineScope(Dispatchers.Default).launch {
+        launch { AppRules.lockdown.drop(1).collect { redraw(Engine.blocked.get()) } }
+        val power = getSystemService(PowerManager::class.java)
+        var shown = 0
+        while (true) {
+            delay(NOTIFY_EVERY_MS)
+            val now = Engine.blocked.get()
+            if (now != shown && power.isInteractive) {
+                shown = now
+                redraw(now)
             }
         }
     }
@@ -362,6 +368,8 @@ class WardenVpnService : VpnService(), Bridge {
         super.onDestroy()
     }
 
+    private fun redraw(blocked: Int) = getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(blocked))
+
     private fun notification(blocked: Int): Notification {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
@@ -375,7 +383,7 @@ class WardenVpnService : VpnService(), Bridge {
         }
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_shield_check)
-            .setContentTitle(getString(R.string.engine_notif_title))
+            .setContentTitle(getString(if (AppRules.lockdown.value) R.string.engine_notif_lockdown else R.string.engine_notif_title))
             .setContentText(
                 if (blocked == 0) getString(R.string.engine_notif_text)
                 else resources.getQuantityString(R.plurals.engine_notif_blocked, blocked, blocked),

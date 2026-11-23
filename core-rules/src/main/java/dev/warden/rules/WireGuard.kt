@@ -21,15 +21,15 @@ class WireGuard private constructor(val userspace: String, val endpoint: String)
                     else -> {
                         val key = line.substringBefore('=', "").trim().lowercase()
                         val target = section
-                        require(key.isNotEmpty() && target != null) { "Not a WireGuard config" }
+                        ensure(key.isNotEmpty() && target != null, Problem.NotWireGuard)
                         target[key] = line.substringAfter('=').trim()
                     }
                 }
             }
-            require(peers.isNotEmpty()) { "No [Peer] section" }
+            ensure(peers.isNotEmpty(), Problem.NoPeer)
             val out = StringBuilder()
             out.line("private_key", hexKey(iface["privatekey"], "PrivateKey"))
-            out.line("address", list(iface["address"]).ifEmpty { throw IllegalArgumentException("Missing Address") })
+            out.line("address", list(iface["address"]).ifEmpty { throw InvalidInput(Problem.NoAddress) })
             out.line("dns", list(iface["dns"]).ifEmpty { DEFAULT_DNS })
             out.line("mtu", iface["mtu"]?.toIntOrNull()?.toString() ?: "-1") // -1: firestack picks
             out.line("replace_peers", "true")
@@ -40,12 +40,17 @@ class WireGuard private constructor(val userspace: String, val endpoint: String)
                 p["endpoint"]?.let { out.line("endpoint", it) }
                 p["persistentkeepalive"]?.toIntOrNull()?.let { out.line("persistent_keepalive_interval", it.toString()) }
             }
-            val endpoint = peers.firstNotNullOfOrNull { it["endpoint"] }
-            require(endpoint != null) { "No Endpoint in [Peer]" }
-            require(endpoint.substringAfterLast(':', "").toIntOrNull() in 1..MAX_PORT) {
-                "Endpoint needs a port, like vpn.example.com:51820"
-            }
-            return WireGuard(out.toString(), endpoint.substringBeforeLast(':').trim('[', ']'))
+            val endpoint = peers.firstNotNullOfOrNull { it["endpoint"] } ?: throw InvalidInput(Problem.NoEndpoint)
+            return WireGuard(out.toString(), endpointHost(endpoint))
+        }
+
+        /** "host:port" or "[v6]:port" → the host; anything else is refused with a reason. */
+        private fun endpointHost(endpoint: String): String {
+            val host = endpoint.substringBeforeLast(':', "")
+            ensure(endpoint.substringAfterLast(':', "").toIntOrNull() in 1..MAX_PORT, Problem.NoPort)
+            // Unbracketed IPv6: the "port" found above is really the last group of the address.
+            ensure(':' !in host || (host.startsWith('[') && host.endsWith(']')), Problem.Ipv6NeedsBrackets)
+            return host.trim('[', ']')
         }
 
         /**
@@ -77,7 +82,7 @@ class WireGuard private constructor(val userspace: String, val endpoint: String)
 
         private fun hexKey(b64: String?, name: String): String {
             val bytes = runCatching { Base64.getDecoder().decode(b64.orEmpty().trim()) }.getOrNull()
-            require(bytes != null && bytes.size == KEY_BYTES) { "Missing or invalid $name" }
+            ensure(bytes != null && bytes.size == KEY_BYTES, Problem.BadKey, name)
             return bytes.joinToString("") { "%02x".format(it) }
         }
 

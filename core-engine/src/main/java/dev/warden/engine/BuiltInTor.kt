@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 
-enum class TorState { Off, Starting, On }
+/** Failed: Tor stopped or reported an error while apps still wanted it (a port taken, say). */
+enum class TorState { Off, Starting, On, Failed }
 
 /**
  * Tor built into Warden (tor-android, BSD-3-Clause, Guardian Project), started by the VPN only while
@@ -26,8 +27,8 @@ enum class TorState { Off, Starting, On }
  * Tor has built its first circuit. Tor's DNS port resolves names through Tor, so lookups don't leak.
  */
 object BuiltInTor {
-    // Fixed ports, so this process needn't ask Tor. ponytail: if one is taken Tor won't start and
-    // Tor apps stay offline; pick free ports at start if that's ever reported.
+    // Fixed ports, so this process needn't ask Tor. ponytail: if one is taken Tor fails (shown as Failed,
+    // with Try again) and Tor apps stay offline; pick free ports at start if that's ever reported.
     const val SOCKS_PORT = 9065
     const val DNS_PORT = 9066
 
@@ -40,16 +41,18 @@ object BuiltInTor {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) = Unit
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            _state.value = TorState.Off // the :tor process died; Android rebinds and Tor starts again
+            _state.value = TorState.Starting // the :tor process died; Android rebinds and Tor starts again
         }
     }
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            _state.value = when (intent.getStringExtra(EXTRA_STATUS)) {
-                "ON" -> TorState.On
-                "STARTING" -> TorState.Starting
-                else -> TorState.Off
+            // stop() unregisters first, so an OFF/STOPPING or an error arriving here wasn't asked for.
+            _state.value = when {
+                intent.action == ACTION_ERROR -> TorState.Failed
+                intent.getStringExtra(EXTRA_STATUS) == "ON" -> TorState.On
+                intent.getStringExtra(EXTRA_STATUS) == "STARTING" -> TorState.Starting
+                else -> TorState.Failed
             }
         }
     }
@@ -63,7 +66,7 @@ object BuiltInTor {
                 .writeText("SOCKSPort 127.0.0.1:$SOCKS_PORT\nDNSPort 127.0.0.1:$DNS_PORT\n")
         }
         // Not exported: only our own app (the :tor process) can report, so no other app can fake "connected".
-        val filter = IntentFilter(ACTION_STATUS)
+        val filter = IntentFilter(ACTION_STATUS).apply { addAction(ACTION_ERROR) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             app.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
@@ -86,8 +89,15 @@ object BuiltInTor {
         _state.value = TorState.Off
     }
 
+    /** Start Tor again from scratch, e.g. after it failed. */
+    @Synchronized fun retry(context: Context) {
+        stop()
+        start(context)
+    }
+
     private const val TOR_PROCESS = ":tor" // matches android:process in the manifest
     private const val TOR_SERVICE = "org.torproject.jni.TorService"
     private const val ACTION_STATUS = "org.torproject.android.intent.action.STATUS"
+    private const val ACTION_ERROR = "org.torproject.android.intent.action.ERROR"
     private const val EXTRA_STATUS = "org.torproject.android.intent.extra.STATUS"
 }

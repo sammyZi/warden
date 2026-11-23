@@ -114,7 +114,7 @@ internal fun WireGuardRow(countryOf: suspend (ip: String) -> String?) {
         error = runCatching {
             val text = context.contentResolver.openInputStream(uri)?.use { String(it.readBytes()) }
             Routing.addServer(text ?: throw IllegalArgumentException(badFile), displayName(context, uri))
-        }.exceptionOrNull()?.let { it.message ?: badFile }
+        }.exceptionOrNull()?.let { problemText(context, it, badFile) }
     }
     var manual by rememberSaveable { mutableStateOf(false) }
     var scanning by rememberSaveable { mutableStateOf(false) }
@@ -195,7 +195,7 @@ internal fun WireGuardRow(countryOf: suspend (ip: String) -> String?) {
         QrScanDialog(
             onResult = { text ->
                 scanning = false
-                error = runCatching { Routing.addServer(text, "") }.exceptionOrNull()?.let { it.message ?: badFile }
+                error = runCatching { Routing.addServer(text, "") }.exceptionOrNull()?.let { problemText(context, it, badFile) }
             },
             onDismiss = { scanning = false },
         )

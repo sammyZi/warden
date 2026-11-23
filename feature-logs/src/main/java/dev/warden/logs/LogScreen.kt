@@ -1,5 +1,16 @@
 package dev.warden.logs
 
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.material3.CircularProgressIndicator
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import java.io.File
+import androidx.core.content.FileProvider
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import android.content.Intent
+import android.content.Context
 import kotlinx.coroutines.launch
 import java.util.Locale
 import java.text.SimpleDateFormat
@@ -237,6 +248,7 @@ internal fun DomainRuleChips(uid: Int, domain: String, modifier: Modifier = Modi
                     DomainChoice.Default -> R.string.rule_default
                     DomainChoice.AllowHere -> R.string.rule_allow_here
                     DomainChoice.BlockHere -> R.string.rule_block_here
+                    DomainChoice.AllowEverywhere -> R.string.rule_allow_everywhere
                     DomainChoice.BlockEverywhere -> R.string.rule_block_everywhere
                 },
             )
@@ -248,34 +260,92 @@ internal fun DomainRuleChips(uid: Int, domain: String, modifier: Modifier = Modi
 }
 
 /**
- * Saves the whole history (up to 30 days) as a CSV file where the user picks. A PCAP isn't offered:
- * Warden never records packets, only who connected where, so a capture would have to be made up.
+ * Export the whole history (up to 30 days) as CSV: share a copy with another app, or save it on the phone.
+ * A PCAP isn't offered: Warden never records packets, only who connected where, so it would be made up.
  */
 @Composable
 private fun ExportButton(appLabel: (Int) -> String) {
     val c = Warden.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var open by remember { mutableStateOf(false) }
+    // Writing the CSV takes a few seconds on a long history: show it's working and ignore taps until done.
+    var busy by remember { mutableStateOf(false) }
+    val busyText = stringResource(R.string.log_export_busy)
+    val name = "warden-log-" + SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) + ".csv"
     val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
+        busy = true
         scope.launch {
             val rows = runCatching {
                 context.contentResolver.openOutputStream(uri)?.use { History.exportCsv(it, appLabel) }
             }.getOrNull()
-            val text = if (rows == null) {
-                context.getString(R.string.log_export_failed)
-            } else {
-                context.resources.getQuantityString(R.plurals.log_exported, rows, rows)
-            }
-            Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+            busy = false
+            toast(context, rows)
         }
     }
-    Box(
-        Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button) {
-            save.launch("warden-log-" + SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) + ".csv")
-        },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(painterResource(DesignR.drawable.ph_export), stringResource(R.string.log_export), Modifier.size(24.dp), tint = c.text)
+    Box {
+        Box(
+            Modifier.size(48.dp).clip(CircleShape).clickable(enabled = !busy, role = Role.Button) { open = true }
+                .semantics { if (busy) stateDescription = busyText },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (busy) {
+                CircularProgressIndicator(Modifier.size(22.dp), color = c.accentInk, strokeWidth = 2.dp)
+            } else {
+                Icon(painterResource(DesignR.drawable.ph_export), stringResource(R.string.log_export), Modifier.size(24.dp), tint = c.text)
+            }
+        }
+        DropdownMenu(open, { open = false }, containerColor = c.surface) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.log_export_share), style = Warden.type.body) },
+                onClick = {
+                    open = false
+                    busy = true
+                    scope.launch {
+                        val ok = shareCsv(context, name, appLabel)
+                        busy = false
+                        if (!ok) toast(context, null)
+                    }
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.log_export_save), style = Warden.type.body) },
+                onClick = {
+                    open = false
+                    save.launch(name)
+                },
+            )
+        }
     }
 }
+
+/** Writes the CSV to a private cache folder and opens the share sheet on a copy of it. */
+private suspend fun shareCsv(context: Context, name: String, appLabel: (Int) -> String): Boolean {
+    val file = runCatching {
+        withContext(Dispatchers.IO) {
+            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            dir.listFiles()?.forEach { it.delete() } // one export at a time; no history piling up in the cache
+            File(dir, name).also { f -> f.outputStream().use { History.exportCsv(it, appLabel) } }
+        }
+    }.getOrNull() ?: return false
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.exports", file)
+    val send = Intent(Intent.ACTION_SEND)
+        .setType("text/csv")
+        .putExtra(Intent.EXTRA_STREAM, uri)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(Intent.createChooser(send, null))
+    return true
+}
+
+private fun toast(context: Context, rows: Int?) {
+    val text = if (rows == null) {
+        context.getString(R.string.log_export_failed)
+    } else {
+        context.resources.getQuantityString(R.plurals.log_exported, rows, rows)
+    }
+    Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+}
+
+/** Its own FileProvider subclass, since an app can declare the plain class only once (the report card has it). */
+class ExportFileProvider : FileProvider()

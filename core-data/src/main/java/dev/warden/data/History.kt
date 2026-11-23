@@ -186,9 +186,9 @@ object History {
         rows
     }
 
-    /** Quoted when it holds a comma, quote or line break; a leading = + - @ is defused for spreadsheets. */
+    /** Quoted when it holds a comma, quote or line break; text starting = + - @ is defused (numbers aren't). */
     internal fun csvCell(v: String): String {
-        val safe = if (v.isNotEmpty() && v[0] in "=+-@") "'$v" else v
+        val safe = if (v.isNotEmpty() && v[0] in "=+-@" && v.toDoubleOrNull() == null) "'$v" else v
         return if (safe.any { it in CSV_SPECIAL }) "\"" + safe.replace("\"", "\"\"") + "\"" else safe
     }
 

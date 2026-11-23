@@ -1,5 +1,6 @@
 package dev.warden.settings
 
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +36,7 @@ import dev.warden.rules.WireGuard
 @Composable
 internal fun ManualServerDialog(onDone: () -> Unit) {
     val c = Warden.colors
+    val context = LocalContext.current
     var name by rememberSaveable { mutableStateOf("") }
     var privateKey by rememberSaveable { mutableStateOf("") }
     var address by rememberSaveable { mutableStateOf("") }
@@ -62,7 +64,7 @@ internal fun ManualServerDialog(onDone: () -> Unit) {
             WardenButton(stringResource(R.string.wg_manual_save), {
                 error = runCatching {
                     Routing.addServer(WireGuard.conf(privateKey, address, dns, publicKey, endpoint, presharedKey), name)
-                }.exceptionOrNull()?.let { it.message.orEmpty() }
+                }.exceptionOrNull()?.let { problemText(context, it, context.getString(R.string.wg_unreadable)) }
                 if (error == null) onDone()
             })
         },

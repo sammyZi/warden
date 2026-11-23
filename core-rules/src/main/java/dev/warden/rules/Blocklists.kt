@@ -109,8 +109,8 @@ object Blocklists {
      */
     fun addCustom(name: String, url: String) {
         val clean = url.trim()
-        require(isValidListUrl(clean)) { "Needs a full https:// address" }
-        require(_sources.value.none { it.url == clean }) { "That list is already added" }
+        ensure(isValidListUrl(clean), Problem.NotHttps)
+        ensure(_sources.value.none { it.url == clean }, Problem.AlreadyAdded)
         val id = "custom-" + System.currentTimeMillis()
         val label = name.trim().ifEmpty { hostOf(clean) }
         prefs.edit().putString(CUSTOM_URL + id, clean).putString(CUSTOM_NAME + id, name.trim()).apply()
@@ -151,7 +151,14 @@ object Blocklists {
             fetch(source.url, tmp)
             val entries = tmp.useLines { BlocklistParser.parse(it, HashSet()) }
             if (entries == 0) throw IOException("no domains in ${source.url}")
-            lock.withLock { tmp.renameTo(file(id)) || throw IOException("could not save $id") }
+            lock.withLock {
+                // Deleted while it downloaded: drop it rather than leave a file nothing points to.
+                if (_sources.value.none { it.id == id }) {
+                    tmp.delete()
+                    return
+                }
+                tmp.renameTo(file(id)) || throw IOException("could not save $id")
+            }
             val now = System.currentTimeMillis()
             prefs.edit().putInt("n.$id", entries).putLong("t.$id", now).apply()
             set(id) { it.copy(entries = entries, updatedAt = now, busy = false) }

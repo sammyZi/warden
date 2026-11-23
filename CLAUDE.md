@@ -19,7 +19,7 @@ Kotlin only, minSdk 26, compile/target SDK 37. Gradle 9.6.1, AGP 9.5 (built-in K
 `:app` (DI, navigation, theme) · `:core-engine` · `:core-rules` · `:core-data` · `:core-attribution` · `:core-design` · `:feature-dashboard` · `:feature-apps` · `:feature-logs` · `:feature-settings` · `:feature-reports`. Create a module when it gets its first real code.
 
 ## Design system (follow strictly)
-- Calm, precise, editorial. No purple/blue gradients, glassmorphism, emoji icons, stacks of identical rounded cards, or generic Material blue. One accent, whitespace, big numbers as heroes.
+- Calm, precise, editorial. No purple/blue gradients, glassmorphism, emoji icons, stacks of identical rounded cards, or generic Material blue. One exception (owner's call, 2026-11): country flag emoji, to name countries on the map and VPN screens. One accent, whitespace, big numbers as heroes.
 - Rubik 400/500/600, bundled (never downloadable fonts). `tnum` on all counters. Display 44/48 Medium, Headline 28/34 SemiBold, Title 20/26 Medium, Body 16/24 Regular, Label 13/16 Medium +0.2sp.
 - Colors light/dark: background #F6F4EF/#0F1211, surface #FFFFFF/#171B1A, surfaceVariant #ECE9E1/#1F2423, outline #D9D5CA/#2B3230, text #16181A/#ECEFEA, muted #6B6F73/#8D9692, primary #1F6F5B/#4FD1A5, blocked #D8472B/#FF6B4A, warning #E0A526/#F2BC45. Green = protected, vermilion = blocked. Dynamic color opt-in, off by default.
   - Contrast check (2026-10-29): light muted, blocked and warning fail 4.5:1 as text. Proposed text-safe light tones: muted #62666A, blocked #B9391F, warning #876000 (keep originals for fills/large shapes). All dark tones pass.

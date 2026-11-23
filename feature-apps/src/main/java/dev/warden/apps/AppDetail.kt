@@ -387,6 +387,7 @@ internal fun DomainRuleChips(uid: Int, domain: String, modifier: Modifier = Modi
                     DomainChoice.Default -> R.string.rule_default
                     DomainChoice.AllowHere -> R.string.rule_allow_here
                     DomainChoice.BlockHere -> R.string.rule_block_here
+                    DomainChoice.AllowEverywhere -> R.string.rule_allow_everywhere
                     DomainChoice.BlockEverywhere -> R.string.rule_block_everywhere
                 },
             )

@@ -98,7 +98,10 @@ object UpdateCheck {
             NotificationChannel(CHANNEL, context.getString(R.string.update_channel), NotificationManager.IMPORTANCE_DEFAULT),
         )
         val open = PendingIntent.getActivity(
-            context, 0, Intent(Intent.ACTION_VIEW, Uri.parse(url)), PendingIntent.FLAG_IMMUTABLE,
+            context,
+            0,
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), // started outside an activity
+            PendingIntent.FLAG_IMMUTABLE,
         )
         nm.notify(
             NOTIFICATION_ID,
