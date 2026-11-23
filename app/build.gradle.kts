@@ -15,8 +15,8 @@ android {
         applicationId = "dev.warden"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.compileSdk.get().toInt()
-        versionCode = 4
-        versionName = "0.2.1"
+        versionCode = 5
+        versionName = "0.3.0"
     }
 
     // One APK per CPU type keeps downloads small (the engine's native library is ~20 MB per type),
